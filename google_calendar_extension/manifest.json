@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "Google Calendar Agenda Extender - By Youmni",
+    "version": "1.0",
+    "description": "Voegt extra velden toe bij het aanmaken van een nieuwe agenda in Google Calendar.",
+    "permissions": [],
+    "content_scripts": [
+      {
+        "matches": ["https://calendar.google.com/calendar/*"],
+        "js": ["translations.js", "content.js"],
+        "css": ["styles.css"]
+      }
+    ]
+  }
+  

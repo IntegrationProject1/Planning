@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Start de app
-CMD ["python", "calander-service.py"]
+CMD ["python", "event_producers/app.py"]

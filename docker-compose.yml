@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  webhook:
+  event_producer:
     build:
       context: .
       dockerfile: Dockerfile
@@ -14,4 +14,28 @@ services:
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     volumes:
       - ./credentials.json:/app/credentials.json:ro
+    depends_on:
+      - mysql
     restart: unless-stopped
+
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin
+    environment:
+      PMA_HOST: mysql
+    ports:
+      - "30018:80"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

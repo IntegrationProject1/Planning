@@ -17,6 +17,8 @@ services:
     depends_on:
       - mysql
     restart: unless-stopped
+    networks:
+      - planning_network
 
   mysql:
     image: mysql:5.7
@@ -28,6 +30,8 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
+    networks:
+      - planning_network
 
   phpmyadmin:
     image: phpmyadmin
@@ -36,6 +40,29 @@ services:
     ports:
       - "30018:80"
     restart: unless-stopped
+    networks:
+      - planning_network
+
+  heartbeat:
+    build:
+      context: ./heartbeat
+      dockerfile: Dockerfile
+    container_name: planning_heartbeat
+    depends_on:
+      - event_producer
+    environment:
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - planning_network
+
+networks:
+  planning_network:
+    name: planning_network
+    driver: bridge
 
 volumes:
   mysql_data:

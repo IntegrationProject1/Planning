@@ -15,7 +15,7 @@ RABBITMQ_PASS = os.getenv("RABBITMQ_PASSWORD")
 RABBITMQ_VHOST = "/" 
 
 # === Heartbeat configuratie ===
-SERVICE_NAME = "planning_heartbeat"
+SERVICE_NAME = "Planning"
 EXCHANGE_NAME = "heartbeat"
 ROUTING_KEY = "controlroom_heartbeat"
 HEARTBEAT_INTERVAL = 1  # seconden

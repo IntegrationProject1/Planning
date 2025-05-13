@@ -1,0 +1,63 @@
+.custom-extension {
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .custom-extension .field-row {
+    display: flex;
+    gap: 12px;
+  }
+  
+  .custom-extension input {
+    padding: 0 16px;
+    height: 48px;
+    border: none;
+    border-radius: 4px;
+    background-color: #e9eef6;
+    font-size: 14px;
+    color: #202124;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+  }
+  
+  .custom-extension input:focus {
+    border: 2px solid #1a73e8;
+    background-color: #fff;
+  }
+  
+  textarea[aria-label="Omschrijving"] {
+    display: none !important;
+  }
+  
+  .date-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background-color: #e9eef6;
+    padding: 12px;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  
+  .date-field {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  
+  .date-label {
+    font-size: 14px;
+    color: #5f6368;
+    margin-bottom: 4px;
+    margin-left: 2px;
+  }
+  .validation-error {
+    color: #d93025;
+    font-size: 12px;
+    margin-top: 4px;
+    margin-left: 2px;
+  }
+  

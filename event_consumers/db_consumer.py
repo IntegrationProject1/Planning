@@ -1,75 +1,89 @@
+# File: event_consumers/db_consumer.py
+
+import os
 import mysql.connector
 
 class DBClient:
-    def __init__(self, config: dict):
-        print("Connecting to MySQL...", flush=True)
+    """
+    Database client for consumer service. Inserts, updates, deletes events
+    and their registered users into MySQL.
+    """
+    def __init__(self):
+        # Load DB config from environment
+        config = {
+            'host': os.getenv('MYSQL_HOST', 'mysql'),
+            'user': os.getenv('MYSQL_USER'),
+            'password': os.getenv('MYSQL_PASSWORD'),
+            'database': os.getenv('MYSQL_DATABASE')
+        }
+        print("Initialiseren van MySQL-verbinding (consumer)...", flush=True)
         self.conn = mysql.connector.connect(**config)
-        self.cursor = self.conn.cursor()
-        self._create_table()
-        print("MySQL connected and table ready", flush=True)
+        # cursor die dicts teruggeeft in plaats van tuples
+        self.cursor = self.conn.cursor(dictionary=True)
 
-    def _create_table(self):
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS calendars (
-                uuid VARCHAR(36) PRIMARY KEY,
-                calendar_id VARCHAR(255),
-                name VARCHAR(255),
-                created_at DATETIME,
-                start_datetime DATETIME,
-                end_datetime DATETIME,
-                description TEXT,
-                capacity INT,
-                organizer VARCHAR(255),
-                event_type VARCHAR(255),
-                location VARCHAR(255),
-                last_fetched DATETIME
-            )
-        """)
-
-    def get_by_uuid(self, uuid: str) -> dict:
-        self.cursor.execute("SELECT * FROM calendars WHERE uuid = %s", (uuid,))
-        row = self.cursor.fetchone()
-        if not row:
-            return None
-        cols = [d[0] for d in self.cursor.description]
-        return dict(zip(cols, row))
+        print("MySQL-verbinding consumer klaar", flush=True)
 
     def insert(self, data: dict):
-        self.cursor.execute("""
-            INSERT INTO calendars (
-                uuid, calendar_id, name, created_at, start_datetime, end_datetime,
-                description, capacity, organizer, event_type, location, last_fetched
-            ) VALUES (
-                %(uuid)s, %(calendar_id)s, %(name)s, %(created_at)s,
-                %(start_datetime)s, %(end_datetime)s, %(description)s,
-                %(capacity)s, %(organizer)s, %(event_type)s, %(location)s,
-                %(last_fetched)s
-            )
-        """, data)
+        print(f"Invoegen van nieuwe kalender (consumer) met UUID {data.get('uuid')}...", flush=True)
+        # Extract registered users list if present
+        users = data.pop('registered_users', [])
 
-    def update(self, data: dict, changed_fields: dict):
-        self.cursor.execute("""
-            UPDATE calendars SET
-                calendar_id=%(calendar_id)s,
-                name=%(name)s,
-                created_at=%(created_at)s,
-                start_datetime=%(start_datetime)s,
-                end_datetime=%(end_datetime)s,
-                description=%(description)s,
-                capacity=%(capacity)s,
-                organizer=%(organizer)s,
-                event_type=%(event_type)s,
-                location=%(location)s,
-                last_fetched=%(last_fetched)s
-            WHERE uuid=%(uuid)s
-        """, data)
+        sql = """
+        INSERT INTO calendars (
+            uuid, name, description,
+            start_datetime, end_datetime,
+            location, organizer, capacity, event_type
+        ) VALUES (
+            %(uuid)s, %(name)s, %(description)s,
+            %(start_datetime)s, %(end_datetime)s,
+            %(location)s, %(organizer)s, %(capacity)s, %(event_type)s
+        )
+        ON DUPLICATE KEY UPDATE
+            name=VALUES(name),
+            description=VALUES(description),
+            start_datetime=VALUES(start_datetime),
+            end_datetime=VALUES(end_datetime),
+            location=VALUES(location),
+            organizer=VALUES(organizer),
+            capacity=VALUES(capacity),
+            event_type=VALUES(event_type);
+        """
+        # Execute main upsert
+        self.cursor.execute(sql, data)
+
+        # Sync registered users
+        self.cursor.execute(
+            "DELETE FROM event_users WHERE event_uuid = %s", (data['uuid'],)
+        )
+        for user_uuid in users:
+            self.cursor.execute(
+                "INSERT INTO event_users (event_uuid, user_uuid) VALUES (%s, %s)",
+                (data['uuid'], user_uuid)
+            )
+        print(f"Registered users gesynchroniseerd: {len(users)} entries", flush=True)
+
+    def update(self, uuid: str, fields: dict):
+        print(f"Updaten van kalender (consumer) met UUID {uuid}...", flush=True)
+        sql_set = []
+        params = {}
+        for key, value in fields.items():
+            sql_set.append(f"{key} = %({key})s")
+            params[key] = value
+        params['uuid'] = uuid
+        sql = f"UPDATE calendars SET {', '.join(sql_set)} WHERE uuid = %(uuid)s"
+        self.cursor.execute(sql, params)
 
     def delete(self, uuid: str):
+        print(f"Verwijderen van kalender (consumer) met UUID {uuid}...", flush=True)
+        # Delete event (cascades on event_users)
         self.cursor.execute("DELETE FROM calendars WHERE uuid = %s", (uuid,))
 
     def commit(self):
+        print("Databasewijzigingen consumer vastleggen...", flush=True)
         self.conn.commit()
 
     def close(self):
+        print("Sluiten van MySQL-verbinding (consumer)...", flush=True)
         self.cursor.close()
         self.conn.close()
+        print("MySQL consumer gesloten", flush=True)

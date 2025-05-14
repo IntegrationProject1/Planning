@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "30017:30017"
+    env_file:
+      - .env
     environment:
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - RABBITMQ_PORT=${RABBITMQ_PORT}
@@ -34,7 +36,6 @@ services:
       - mysql
     networks:
       - planning_network
-      - project_network
 
   mysql:
     image: mysql:5.7

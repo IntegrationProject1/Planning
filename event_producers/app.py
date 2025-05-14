@@ -50,9 +50,16 @@ def get_all_calendars(service):
             print(f"Geen 'uuid' in JSON voor {cal.get('summary', '')}, overslaan...", flush=True)
             continue
 
+        # === MINIMALE AANPASSING: valideer en parse de UUID ===
+        uuid_str = parsed['uuid']
+        uuid_dt = parse_date(uuid_str)
+        if uuid_dt is None:
+            print(f"Ongeldige UUID '{uuid_str}' voor kalender '{cal.get('summary','')}', overslaan...", flush=True)
+            continue
+
         try:
             calendars.append({
-                'uuid': parsed['uuid'],
+                'uuid': uuid_dt,
                 'calendar_id': cal['id'],
                 'name': cal.get('summary', ''),
                 'created_at': parse_date(parsed.get('createdAt')),
@@ -76,7 +83,6 @@ def detect_changes(old: dict, new: dict) -> dict:
     changed = {}
     fields = ['name', 'start_datetime', 'end_datetime', 'description',
               'capacity', 'organizer', 'event_type', 'location']
-
     for key in fields:
         old_val = old.get(key)
         new_val = new.get(key)
@@ -87,11 +93,13 @@ def detect_changes(old: dict, new: dict) -> dict:
             print(f"Wijziging gedetecteerd in veld '{key}': {old_val_str} -> {new_val_str}", flush=True)
     return changed
 
-# --- Main ---
+# --- Main synchronization loop ---
 def main():
     print("Laden van Google Calendar credentials...", flush=True)
-    creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     print("Credentials succesvol geladen", flush=True)
+
     print("Bouwen van Google Calendar service...", flush=True)
     service = build('calendar', 'v3', credentials=creds)
     print("Service succesvol gebouwd", flush=True)
@@ -99,6 +107,7 @@ def main():
     print("Initialiseren van RabbitMQ QueueClient...", flush=True)
     queue = QueueClient()
     print("QueueClient succesvol geïnitialiseerd", flush=True)
+
     print("Initialiseren van MySQL DBClient...", flush=True)
     db = DBClient(MYSQL_CONFIG, queue)
     print("DBClient succesvol geïnitialiseerd", flush=True)
@@ -129,11 +138,10 @@ def main():
     queue.close()
     print("Sync cyclus voltooid", flush=True)
 
-# --- Scheduler ---
 if __name__ == "__main__":
     print("Event producer gestart!", flush=True)
     while True:
-        print(f"\n Nieuwe sync gestart om {datetime.utcnow().isoformat()} UTC", flush=True)
+        print(f"\nNieuwe sync gestart om {datetime.utcnow().isoformat()} UTC", flush=True)
         try:
             main()
         except Exception as e:

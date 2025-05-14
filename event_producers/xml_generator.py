@@ -2,15 +2,39 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 def build_event_xml(data: dict) -> str:
-    event = ET.Element("Event")
+    """
+    Build a <CreateEvent> XML string from `data` dict.
+    UUID, StartDateTime en EndDateTime krijgen altijd millisecond-precisie + 'Z'.
+    """
+    event = ET.Element("CreateEvent")
 
-    ET.SubElement(event, "UUID").text = data['uuid']
+    # UUID (kan datetime of string zijn)
+    uuid_val = data.get('uuid')
+    if isinstance(uuid_val, datetime):
+        uuid_txt = uuid_val.isoformat(timespec='milliseconds') + 'Z'
+    else:
+        uuid_txt = str(uuid_val or '')
+    ET.SubElement(event, "UUID").text = uuid_txt
+
     ET.SubElement(event, "Name").text = data.get("name", "")
     ET.SubElement(event, "Description").text = data.get("description", "")
-    start_datetime = data.get("start_datetime")
-    ET.SubElement(event, "StartDateTime").text = start_datetime.isoformat() if isinstance(start_datetime, datetime) else str(start_datetime or "")
-    end_datetime = data.get("end_datetime")
-    ET.SubElement(event, "EndDateTime").text = end_datetime.isoformat() if isinstance(end_datetime, datetime) else str(end_datetime or "")
+
+    # StartDateTime
+    start_val = data.get("start_datetime")
+    if isinstance(start_val, datetime):
+        start_txt = start_val.isoformat(timespec='milliseconds') + 'Z'
+    else:
+        start_txt = str(start_val or "")
+    ET.SubElement(event, "StartDateTime").text = start_txt
+
+    # EndDateTime
+    end_val = data.get("end_datetime")
+    if isinstance(end_val, datetime):
+        end_txt = end_val.isoformat(timespec='milliseconds') + 'Z'
+    else:
+        end_txt = str(end_val or "")
+    ET.SubElement(event, "EndDateTime").text = end_txt
+
     ET.SubElement(event, "Location").text = data.get("location", "")
     ET.SubElement(event, "Organisator").text = data.get("organizer", "")
     ET.SubElement(event, "Capacity").text = str(data.get("capacity", 0))
@@ -26,7 +50,10 @@ def build_update_xml(uuid: str, changed_fields: dict) -> str:
     for name, new_value in changed_fields.items():
         field = ET.SubElement(fields_to_update, "Field")
         ET.SubElement(field, "Name").text = name
-        value = new_value.isoformat() if isinstance(new_value, datetime) else str(new_value)
+        if isinstance(new_value, datetime):
+            value = new_value.isoformat(timespec='milliseconds') + 'Z'
+        else:
+            value = str(new_value)
         print(f"Update veld '{name}' met waarde: {value}", flush=True)
         ET.SubElement(field, "NewValue").text = value
 

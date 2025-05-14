@@ -3,70 +3,56 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
 class CalendarClient:
-    def __init__(self):
-        SCOPES = ['https://www.googleapis.com/auth/calendar']
-        SERVICE_ACCOUNT_FILE = os.environ.get('SERVICE_ACCOUNT_FILE', 'credentials.json')
-        credentials = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE,
-            scopes=SCOPES
+    """
+    Google Calendar client voor:
+     - het aanmaken / updaten / verwijderen van CALENDARS
+     - het subscriben (toevoegen) van een kalender in de CalendarList
+     - het delen (ACL) van een kalender met een andere user
+    """
+    def __init__(self, service_account_file: str):
+        scopes = ['https://www.googleapis.com/auth/calendar']
+        creds = service_account.Credentials.from_service_account_file(
+            service_account_file, scopes=scopes
         )
-        self.service = build('calendar', 'v3', credentials=credentials)
-        self.calendar_id = os.environ['GOOGLE_CALENDAR_ID']
-        # Optioneel: maak de tijdzone configureerbaar via env-var
-        self.timezone = os.environ.get('GOOGLE_TIMEZONE', 'Europe/Brussels')
+        self.service = build('calendar', 'v3', credentials=creds)
 
-    def create_event(self, event_data: dict) -> str:
-        event = {
-            'summary': event_data['name'],
-            'description': event_data['description'],
-            'start': {
-                'dateTime': event_data['start_datetime'].isoformat(),
-                'timeZone': self.timezone
-            },
-            'end': {
-                'dateTime': event_data['end_datetime'].isoformat(),
-                'timeZone': self.timezone
-            },
-            'location': event_data['location'],
+    def create_calendar(self, summary: str, description: str) -> dict:
+        body = {
+            'summary': summary,
+            'description': description
         }
-        created = self.service.events().insert(
-            calendarId=self.calendar_id,
-            body=event
-        ).execute()
-        return created['id']
+        calendar = self.service.calendars().insert(body=body).execute()
+        return calendar  # bevat o.a. 'id' en 'created'
 
-    def update_event(self, event_id: str, updated_fields: dict) -> dict:
-        event = self.service.events().get(
-            calendarId=self.calendar_id,
-            eventId=event_id
-        ).execute()
-        # Merge updates, ensuring timeZone is kept
-        for key, value in updated_fields.items():
-            if key == 'name':
-                event['summary'] = value
-            elif key == 'description':
-                event['description'] = value
-            elif key == 'start_datetime':
-                event['start'] = {
-                    'dateTime': value.isoformat(),
-                    'timeZone': self.timezone
-                }
-            elif key == 'end_datetime':
-                event['end'] = {
-                    'dateTime': value.isoformat(),
-                    'timeZone': self.timezone
-                }
-            elif key == 'location':
-                event['location'] = value
-        updated = self.service.events().update(
-            calendarId=self.calendar_id,
-            eventId=event_id,
-            body=event
-        ).execute()
-        return updated
+    def subscribe_calendar(self, calendar_id: str) -> dict:
+        """
+        Voeg de kalender toe aan de CalendarList van het service-account.
+        Zonder deze stap zie je 'm niet in de UI.
+        """
+        body = { 'id': calendar_id }
+        entry = self.service.calendarList().insert(body=body).execute()
+        return entry
 
-    def delete_event(self, event_id: str):
-        self.service.events().delete(
-            calendarId=self.calendar_id,
-            eventId=event_id
-        ).execute()
+    def share_calendar(self, calendar_id: str, user_email: str, role: str = 'writer') -> dict:
+        """
+        Deel de kalender met een andere gebruiker (bijv. je gmail-account).
+        role: 'reader', 'writer' of 'owner'
+        """
+        body = {
+            'role': role,
+            'scope': {
+                'type': 'user',
+                'value': user_email
+            }
+        }
+        rule = self.service.acl().insert(calendarId=calendar_id, body=body).execute()
+        return rule
+
+    def create_event(self, calendar_id: str, body: dict) -> dict:
+        return self.service.events().insert(calendarId=calendar_id, body=body).execute()
+
+    def update_event(self, calendar_id: str, event_id: str, body: dict) -> dict:
+        return self.service.events().patch(calendarId=calendar_id, eventId=event_id, body=body).execute()
+
+    def delete_event(self, calendar_id: str, event_id: str):
+        return self.service.events().delete(calendarId=calendar_id, eventId=event_id).execute()

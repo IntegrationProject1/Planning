@@ -13,27 +13,40 @@ class DBClient:
         self.cursor = self.conn.cursor()
         self.queue = queue_client
         self._create_table()
-        print("MySQL-verbinding en tabel succesvol geïnitialiseerd", flush=True)
+        print("MySQL-verbinding en tabellen succesvol geïnitialiseerd", flush=True)
 
     def _create_table(self):
         print("Aanmaken van 'calendars' tabel indien nodig...", flush=True)
+        # Kalender-tabel met DATETIME(3) voor tijdvelden
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS calendars (
-                uuid VARCHAR(36) PRIMARY KEY,
+                uuid DATETIME(3) PRIMARY KEY,
                 calendar_id VARCHAR(255),
                 name VARCHAR(255),
-                created_at DATETIME,
-                start_datetime DATETIME,
-                end_datetime DATETIME,
+                created_at DATETIME(3),
+                start_datetime DATETIME(3),
+                end_datetime DATETIME(3),
                 description TEXT,
                 capacity INT,
                 organizer VARCHAR(255),
                 event_type VARCHAR(255),
                 location VARCHAR(255),
-                last_fetched DATETIME
+                last_fetched DATETIME(3)
             )
         """)
-        print("Tabel 'calendars' gecontroleerd/ aangemaakt", flush=True)
+        print("Tabel 'calendars' gecontroleerd/aangemaakt", flush=True)
+
+        print("Aanmaken van 'event_users' tabel indien nodig...", flush=True)
+        # Many-to-many voor geregistreerde users
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS event_users (
+                event_uuid DATETIME(3) NOT NULL,
+                user_uuid VARCHAR(36) NOT NULL,
+                PRIMARY KEY (event_uuid, user_uuid),
+                FOREIGN KEY (event_uuid) REFERENCES calendars(uuid) ON DELETE CASCADE
+            )
+        """)
+        print("Tabel 'event_users' gecontroleerd/aangemaakt", flush=True)
 
     def get_all_uuids(self):
         print("Ophalen van alle UUID's uit de database...", flush=True)
@@ -56,14 +69,21 @@ class DBClient:
 
     def insert(self, data: dict):
         print(f"Invoegen van nieuwe kalender met UUID {data['uuid']}...", flush=True)
+        # Gebruik dezelfde velden, nu correct DATETIME(3)
         self.cursor.execute("""
             INSERT INTO calendars (
-                uuid, calendar_id, name, created_at, start_datetime, end_datetime,
-                description, capacity, organizer, event_type, location, last_fetched
-            ) VALUES (%(uuid)s, %(calendar_id)s, %(name)s, %(created_at)s,
-                      %(start_datetime)s, %(end_datetime)s, %(description)s,
-                      %(capacity)s, %(organizer)s, %(event_type)s, %(location)s,
-                      %(last_fetched)s)
+                uuid, calendar_id, name, created_at,
+                start_datetime, end_datetime,
+                description, capacity,
+                organizer, event_type,
+                location, last_fetched
+            ) VALUES (
+                %(uuid)s, %(calendar_id)s, %(name)s, %(created_at)s,
+                %(start_datetime)s, %(end_datetime)s,
+                %(description)s, %(capacity)s,
+                %(organizer)s, %(event_type)s,
+                %(location)s, %(last_fetched)s
+            )
         """, data)
         xml = build_event_xml(data)
         print(f"Versturen van 'created' bericht voor UUID {data['uuid']}...", flush=True)
@@ -72,6 +92,7 @@ class DBClient:
 
     def update(self, data: dict, changed_fields: dict):
         print(f"Updaten van kalender met UUID {data['uuid']}...", flush=True)
+        # Update behoudt DATETIME(3)-velden
         self.cursor.execute("""
             UPDATE calendars SET
                 calendar_id=%(calendar_id)s,

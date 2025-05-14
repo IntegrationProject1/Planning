@@ -69,7 +69,6 @@ class DBClient:
 
     def insert(self, data: dict):
         print(f"Invoegen van nieuwe kalender met UUID {data['uuid']}...", flush=True)
-        # Gebruik dezelfde velden, nu correct DATETIME(3)
         self.cursor.execute("""
             INSERT INTO calendars (
                 uuid, calendar_id, name, created_at,
@@ -92,7 +91,6 @@ class DBClient:
 
     def update(self, data: dict, changed_fields: dict):
         print(f"Updaten van kalender met UUID {data['uuid']}...", flush=True)
-        # Update behoudt DATETIME(3)-velden
         self.cursor.execute("""
             UPDATE calendars SET
                 calendar_id=%(calendar_id)s,

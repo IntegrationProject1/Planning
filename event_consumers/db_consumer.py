@@ -1,5 +1,3 @@
-# File: event_consumers/db_consumer.py
-
 import os
 import mysql.connector
 
@@ -48,10 +46,8 @@ class DBClient:
             capacity=VALUES(capacity),
             event_type=VALUES(event_type);
         """
-        # Execute main upsert
         self.cursor.execute(sql, data)
 
-        # Sync registered users
         self.cursor.execute(
             "DELETE FROM event_users WHERE event_uuid = %s", (data['uuid'],)
         )

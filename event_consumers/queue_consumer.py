@@ -4,13 +4,6 @@ import time
 
 class QueueConsumer:
     def __init__(self, callback, routing_keys, retries: int = 5, delay: int = 5):
-        """
-        Initialiseert de QueueConsumer.
-        - callback: functie die wordt aangeroepen met (routing_key, body)
-        - routing_keys: lijst van RabbitMQ routing keys om op te luisteren
-        - retries: aantal pogingen voor verbinding
-        - delay: wachttijd (s) tussen pogingen
-        """
         self.exchange = 'event'
         params = pika.ConnectionParameters(
             host=os.environ['RABBITMQ_HOST'],
@@ -61,9 +54,6 @@ class QueueConsumer:
         print(f"Listening on queues: {self.queue_names}", flush=True)
 
     def poll_once(self):
-        """
-        Haalt één bericht op per queue (niet-blocking). Roept callback aan als er een bericht is.
-        """
         for queue in self.queue_names:
             method_frame, header_frame, body = self.channel.basic_get(
                 queue=queue,
@@ -75,9 +65,6 @@ class QueueConsumer:
                 self.callback(routing_key, body)
 
     def start_polling(self, interval_seconds: int = 60):
-        """
-        Continuously poll elke interval_seconds seconden.
-        """
         print(f"Starting polling every {interval_seconds} seconds on {self.queue_names}", flush=True)
         try:
             while True:

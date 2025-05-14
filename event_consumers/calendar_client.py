@@ -7,7 +7,6 @@ class CalendarClient:
     Google Calendar client voor:
      - het aanmaken / updaten / verwijderen van CALENDARS
      - het subscriben (toevoegen) van een kalender in de CalendarList
-     - het delen (ACL) van een kalender met een andere user
     """
     def __init__(self, service_account_file: str):
         scopes = ['https://www.googleapis.com/auth/calendar']
@@ -25,19 +24,11 @@ class CalendarClient:
         return calendar  # bevat o.a. 'id' en 'created'
 
     def subscribe_calendar(self, calendar_id: str) -> dict:
-        """
-        Voeg de kalender toe aan de CalendarList van het service-account.
-        Zonder deze stap zie je 'm niet in de UI.
-        """
         body = { 'id': calendar_id }
         entry = self.service.calendarList().insert(body=body).execute()
         return entry
 
     def share_calendar(self, calendar_id: str, user_email: str, role: str = 'writer') -> dict:
-        """
-        Deel de kalender met een andere gebruiker (bijv. je gmail-account).
-        role: 'reader', 'writer' of 'owner'
-        """
         body = {
             'role': role,
             'scope': {

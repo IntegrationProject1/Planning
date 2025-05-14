@@ -2,13 +2,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 def build_event_xml(data: dict) -> str:
-    """
-    Build a <CreateEvent> XML string from `data` dict.
-    UUID, StartDateTime en EndDateTime krijgen altijd millisecond-precisie + 'Z'.
-    """
     event = ET.Element("CreateEvent")
 
-    # UUID (kan datetime of string zijn)
     uuid_val = data.get('uuid')
     if isinstance(uuid_val, datetime):
         uuid_txt = uuid_val.isoformat(timespec='milliseconds') + 'Z'
@@ -19,7 +14,6 @@ def build_event_xml(data: dict) -> str:
     ET.SubElement(event, "Name").text = data.get("name", "")
     ET.SubElement(event, "Description").text = data.get("description", "")
 
-    # StartDateTime
     start_val = data.get("start_datetime")
     if isinstance(start_val, datetime):
         start_txt = start_val.isoformat(timespec='milliseconds') + 'Z'
@@ -27,7 +21,6 @@ def build_event_xml(data: dict) -> str:
         start_txt = str(start_val or "")
     ET.SubElement(event, "StartDateTime").text = start_txt
 
-    # EndDateTime
     end_val = data.get("end_datetime")
     if isinstance(end_val, datetime):
         end_txt = end_val.isoformat(timespec='milliseconds') + 'Z'

@@ -14,13 +14,11 @@ _field_map = {
     'EventType': 'event_type'
 }
 
-
 def _parse_iso_dt(text: str) -> datetime:
     txt = (text or '').strip()
     if txt.endswith('Z'):
         txt = txt[:-1]
     return datetime.fromisoformat(txt)
-
 
 def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
     root = ET.fromstring(xml_str)
@@ -60,7 +58,6 @@ def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
 
     return data
 
-
 def parse_update_event_xml(xml_str: str) -> Tuple[datetime, Dict[str, Any]]:
     root = ET.fromstring(xml_str)
     if root.tag not in ('UpdateEvent', 'EventUpdate'):
@@ -90,7 +87,6 @@ def parse_update_event_xml(xml_str: str) -> Tuple[datetime, Dict[str, Any]]:
                 fields[key] = new_value
 
     return uuid, fields
-
 
 def parse_delete_event_xml(xml_str: str) -> datetime:
     root = ET.fromstring(xml_str)

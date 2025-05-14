@@ -1,5 +1,3 @@
-# File: event_consumers/app.py
-
 import os
 import time
 from datetime import datetime
@@ -12,10 +10,10 @@ from xml_parser import (
 )
 from calendar_client import CalendarClient
 
-# Environment-configurable values (hardcoded poll-interval)
+# Environment-configurable values
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
 CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
-POLL_INTERVAL = 60  # vaste 60s
+POLL_INTERVAL = 60
 
 # Routing keys
 QUEUES = [
@@ -42,7 +40,6 @@ def handle_message(routing_key: str, body: bytes):
         )
 
         # 3) update DB met Google-metadata
-        # gebruik 'timeCreated' ipv 'created'
         time_created = new_cal.get('timeCreated')
         if time_created:
             # strip trailing Z en parse
@@ -90,16 +87,13 @@ def handle_message(routing_key: str, body: bytes):
         cal_id = row['calendar_id'] if row else None
         if cal_id:
             calcli.delete_calendar(calendar_id=cal_id)
-        # delete uit DB
         db.delete(uid)
 
     else:
         print(f"Onbekende routing_key: {routing_key}", flush=True)
 
-    # commit & close
     db.commit()
     db.close()
-
 
 def main():
     print("Consumer gestart, verbinden met RabbitMQ...", flush=True)
@@ -112,7 +106,6 @@ def main():
         print("— Wacht 60s tot volgende poll —", flush=True)
         consumer.poll_once()
         time.sleep(POLL_INTERVAL)
-
 
 if __name__ == '__main__':
     main()

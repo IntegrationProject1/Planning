@@ -50,7 +50,6 @@ def get_all_calendars(service):
             print(f"Geen 'uuid' in JSON voor {cal.get('summary', '')}, overslaan...", flush=True)
             continue
 
-        # === MINIMALE AANPASSING: valideer en parse de UUID ===
         uuid_str = parsed['uuid']
         uuid_dt = parse_date(uuid_str)
         if uuid_dt is None:

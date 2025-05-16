@@ -1,9 +1,12 @@
 name: Unit tests for development branch
 
+# This workflow runs unit tests on the development branch of the repository.
+# It is triggered on push and pull request events.
 on:
   push:
     branches:
       - development
+      - 'features/**'
   pull_request:
     branches:
       - development

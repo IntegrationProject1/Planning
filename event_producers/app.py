@@ -5,8 +5,8 @@ from datetime import datetime
 from dateutil import parser as dateparser
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from db_producer import DBClient
-from event_producer import QueueClient
+from event_producers.db_producer import DBClient
+from event_producers.event_producer import QueueClient
 
 print("app.py is gestart!", flush=True)
 

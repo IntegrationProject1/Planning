@@ -1,6 +1,6 @@
 import mysql.connector
 from datetime import datetime
-from xml_generator import (
+from event_producers.xml_generator import (
     build_event_xml,
     build_update_xml,
     build_delete_xml

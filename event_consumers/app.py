@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from datetime import datetime
 from queue_consumer import QueueConsumer
 from db_consumer import DBClient
@@ -8,14 +9,14 @@ from xml_parser import (
     parse_update_event_xml,
     parse_delete_event_xml
 )
-from calendar_client import CalendarClient
+from calendar_client import CalendarClient  # in dezelfde folder als app.py
 
-# Environment-configurable values
+# Environment-configuratie uit .env
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
-CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
-POLL_INTERVAL = 60
+SHARE_WITH_EMAIL    = os.getenv('SHARE_WITH_EMAIL')
+POLL_INTERVAL       = int(os.getenv('POLL_INTERVAL', 60))
 
-# Routing keys
+# Routing keys voor RabbitMQ
 QUEUES = [
     os.getenv('EVENT_CREATED_QUEUE', 'event.created'),
     os.getenv('EVENT_UPDATED_QUEUE', 'event.updated'),
@@ -24,76 +25,111 @@ QUEUES = [
 
 
 def handle_message(routing_key: str, body: bytes):
-    xml = body.decode('utf-8')
-    db = DBClient()
+    xml    = body.decode('utf-8')
+    db     = DBClient()
     calcli = CalendarClient(SERVICE_ACCOUNT_FILE)
 
-    if routing_key == QUEUES[0]:  # created
+    if routing_key == QUEUES[0]:  # event.created
         data = parse_create_event_xml(xml)
-        # 1) schrijf in DB (zonder Google-metadata)
+        # 1) Into DB
         db.insert(data)
 
-        # 2) maak nieuwe Google Calendar aan
+        # 2) Bouw JSON payload voor kalender description
+        uuid_val = data['uuid']
+        uuid_str = uuid_val.isoformat() + 'Z' if isinstance(uuid_val, datetime) else uuid_val
+        payload = {
+            'uuid':           uuid_str,
+            'createdAt':      datetime.utcnow().isoformat() + 'Z',
+            'startDateTime':  data['start_datetime'].isoformat() + 'Z',
+            'endDateTime':    data['end_datetime'].isoformat() + 'Z',
+            'description':    data['description'],
+            'capacity':       data.get('capacity'),
+            'organizer':      data.get('organisator') or data.get('organizer'),
+            'eventType':      data.get('event_type')  or data.get('eventType'),
+            'location':       data.get('location')
+        }
+
+        # 3) Nieuwe kalender maken met JSON-description
         new_cal = calcli.create_calendar(
-            summary=data['name'],
-            description=data['description']
+            summary    = data['name'],
+            description= json.dumps(payload)
         )
+        # 4) Subscribe zodat zichtbaar in CalendarList
+        calcli.subscribe_calendar(new_cal['id'])
+        # 5) Deel met test-account
+        if SHARE_WITH_EMAIL:
+            calcli.share_calendar(new_cal['id'], SHARE_WITH_EMAIL)
 
-        # 3) update DB met Google-metadata
+        # 6) Maak event in deze kalender
+        event_body = {
+            'summary':     data['name'],
+            'description': data['description'],
+            'start':       {'dateTime': data['start_datetime'].isoformat() + 'Z'},
+            'end':         {'dateTime': data['end_datetime'].isoformat()   + 'Z'},
+            'location':    data.get('location'),
+            'attendees':   [{'email': u['uuid']} for u in data.get('registered_users', [])]
+        }
+        created_evt = calcli.create_event(new_cal['id'], event_body)
+
+        # 7) Metadata in DB opslaan
         time_created = new_cal.get('timeCreated')
-        if time_created:
-            # strip trailing Z en parse
-            created_at = datetime.fromisoformat(time_created.rstrip('Z'))
-        else:
-            created_at = datetime.utcnow()
-
+        created_at = (datetime.fromisoformat(time_created.rstrip('Z'))
+                      if time_created else datetime.utcnow())
         db.update(data['uuid'], {
-            'calendar_id': new_cal['id'],
-            'created_at': created_at,
+            'calendar_id':  new_cal['id'],
+            'created_at':   created_at,
             'last_fetched': datetime.utcnow()
         })
 
-    elif routing_key == QUEUES[1]:  # updated
+    elif routing_key == QUEUES[1]:  # event.updated
         uid, fields = parse_update_event_xml(xml)
         db.update(uid, fields)
 
-        # push update naar Google
-        rec = db.cursor.execute(
+        # Haal calendar_id + event_id op
+        db.cursor.execute(
             "SELECT calendar_id FROM calendars WHERE uuid = %s", (uid,)
         )
         row = db.cursor.fetchone()
-        cal_id = row['calendar_id'] if row else None
-        if cal_id:
-            body = {}
-            if 'name' in fields:
-                body['summary'] = fields['name']
-            if 'description' in fields:
-                body['description'] = fields['description']
-            if 'start_datetime' in fields:
-                body.setdefault('start', {})['dateTime'] = fields['start_datetime'].isoformat(timespec='milliseconds') + 'Z'
-            if 'end_datetime' in fields:
-                body.setdefault('end', {})['dateTime'] = fields['end_datetime'].isoformat(timespec='milliseconds') + 'Z'
-            calcli.update_event(calendar_id=CALENDAR_ID, event_id=cal_id, body=body)
+        if row:
+            cal_id = row['calendar_id']
+            events = calcli.service.events().list(calendarId=cal_id).execute()
+            items = events.get('items', [])
+            if items:
+                evt_id = items[0]['id']
+                body = {}
+                if 'name' in fields:
+                    body['summary'] = fields['name']
+                if 'description' in fields:
+                    body['description'] = fields['description']
+                if 'start_datetime' in fields:
+                    body.setdefault('start', {})['dateTime'] = (
+                        fields['start_datetime'].isoformat() + 'Z'
+                    )
+                if 'end_datetime' in fields:
+                    body.setdefault('end', {})['dateTime'] = (
+                        fields['end_datetime'].isoformat() + 'Z'
+                    )
+                if body:
+                    calcli.update_event(cal_id, evt_id, body)
 
         db.update(uid, {'last_fetched': datetime.utcnow()})
 
-    elif routing_key == QUEUES[2]:  # deleted
+    elif routing_key == QUEUES[2]:  # event.deleted
         uid = parse_delete_event_xml(xml)
-        # delete Google Calendar
-        rec = db.cursor.execute(
+        db.cursor.execute(
             "SELECT calendar_id FROM calendars WHERE uuid = %s", (uid,)
         )
         row = db.cursor.fetchone()
-        cal_id = row['calendar_id'] if row else None
-        if cal_id:
-            calcli.delete_calendar(calendar_id=cal_id)
+        if row:
+            calcli.delete_calendar(row['calendar_id'])
         db.delete(uid)
 
     else:
-        print(f"Onbekende routing_key: {routing_key}", flush=True)
+        print(f"Onbekende routing key: {routing_key}", flush=True)
 
     db.commit()
     db.close()
+
 
 def main():
     print("Consumer gestart, verbinden met RabbitMQ...", flush=True)
@@ -101,11 +137,10 @@ def main():
         callback=handle_message,
         routing_keys=QUEUES
     )
-
     while True:
-        print("— Wacht 60s tot volgende poll —", flush=True)
         consumer.poll_once()
         time.sleep(POLL_INTERVAL)
+
 
 if __name__ == '__main__':
     main()

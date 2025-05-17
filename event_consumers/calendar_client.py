@@ -6,9 +6,7 @@ class CalendarClient:
     """
     Google Calendar client voor:
      - het aanmaken / updaten / verwijderen van CALENDARS
-     - delen van kalenders met andere gebruikers
      - subscriben (toevoegen) van kalenders aan je CalendarList
-     - creëren, bijwerken en verwijderen van EVENTS
     """
     def __init__(self, service_account_file: str, subject: str = None):
         scopes = ['https://www.googleapis.com/auth/calendar']

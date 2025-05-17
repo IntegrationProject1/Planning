@@ -9,7 +9,7 @@ from xml_parser import (
     parse_update_event_xml,
     parse_delete_event_xml
 )
-from calendar_client import CalendarClient  # in dezelfde folder als app.py
+from calendar_client import CalendarClient
 
 # Environment-configuratie uit .env
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
@@ -22,7 +22,6 @@ QUEUES = [
     os.getenv('EVENT_UPDATED_QUEUE', 'event.updated'),
     os.getenv('EVENT_DELETED_QUEUE', 'event.deleted')
 ]
-
 
 def handle_message(routing_key: str, body: bytes):
     xml    = body.decode('utf-8')
@@ -56,6 +55,7 @@ def handle_message(routing_key: str, body: bytes):
         )
         # 4) Subscribe zodat zichtbaar in CalendarList
         calcli.subscribe_calendar(new_cal['id'])
+
         # 5) Deel met test-account
         if SHARE_WITH_EMAIL:
             calcli.share_calendar(new_cal['id'], SHARE_WITH_EMAIL)
@@ -130,7 +130,6 @@ def handle_message(routing_key: str, body: bytes):
     db.commit()
     db.close()
 
-
 def main():
     print("Consumer gestart, verbinden met RabbitMQ...", flush=True)
     consumer = QueueConsumer(
@@ -140,7 +139,6 @@ def main():
     while True:
         consumer.poll_once()
         time.sleep(POLL_INTERVAL)
-
 
 if __name__ == '__main__':
     main()

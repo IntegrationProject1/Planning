@@ -4,7 +4,7 @@ services:
   event_producer:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: event_producers/Dockerfile
     ports:
       - "30017:30017"
     env_file:
@@ -25,10 +25,9 @@ services:
   event_consumer:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: event_consumers/Dockerfile
     env_file:
       - .env
-    command: ["python", "event_consumers/app.py"]
     volumes:
       - ./credentials.json:/app/credentials.json:ro
     restart: unless-stopped

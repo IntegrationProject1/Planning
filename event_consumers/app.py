@@ -2,19 +2,21 @@ import os
 import time
 import json
 from datetime import datetime
-from queue_consumer import QueueConsumer
-from db_consumer import DBClient
-from xml_parser import (
+from dotenv import load_dotenv
+from event_consumers.queue_consumer import QueueConsumer
+from event_consumers.db_consumer import DBClient
+from event_consumers.xml_parser import (
     parse_create_event_xml,
     parse_update_event_xml,
     parse_delete_event_xml
 )
-from calendar_client import CalendarClient
+from event_consumers.calendar_client import CalendarClient
 
-# Environment-configuratie uit .env
+# Laad omgevingsvariabelen uit .env
+load_dotenv()
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
-SHARE_WITH_EMAIL    = os.getenv('SHARE_WITH_EMAIL')
-POLL_INTERVAL       = int(os.getenv('POLL_INTERVAL', 60))
+IMPERSONATED_USER    = os.getenv('IMPERSONATED_USER')
+POLL_INTERVAL        = 60  # Vast poll-interval in seconden
 
 # Routing keys voor RabbitMQ
 QUEUES = [
@@ -26,7 +28,10 @@ QUEUES = [
 def handle_message(routing_key: str, body: bytes):
     xml    = body.decode('utf-8')
     db     = DBClient()
-    calcli = CalendarClient(SERVICE_ACCOUNT_FILE)
+    # Client initialisatie met impersonatie
+    if not IMPERSONATED_USER:
+        raise RuntimeError('IMPERSONATED_USER is niet ingesteld in .env')
+    calcli = CalendarClient(SERVICE_ACCOUNT_FILE, IMPERSONATED_USER)
 
     if routing_key == QUEUES[0]:  # event.created
         data = parse_create_event_xml(xml)
@@ -44,7 +49,7 @@ def handle_message(routing_key: str, body: bytes):
             'description':    data['description'],
             'capacity':       data.get('capacity'),
             'organizer':      data.get('organisator') or data.get('organizer'),
-            'eventType':      data.get('event_type')  or data.get('eventType'),
+            'eventType':      data.get('event_type') or data.get('eventType'),
             'location':       data.get('location')
         }
 
@@ -56,22 +61,18 @@ def handle_message(routing_key: str, body: bytes):
         # 4) Subscribe zodat zichtbaar in CalendarList
         calcli.subscribe_calendar(new_cal['id'])
 
-        # 5) Deel met test-account
-        if SHARE_WITH_EMAIL:
-            calcli.share_calendar(new_cal['id'], SHARE_WITH_EMAIL)
-
-        # 6) Maak event in deze kalender
+        # 5) Maak event in deze kalender
         event_body = {
             'summary':     data['name'],
             'description': data['description'],
             'start':       {'dateTime': data['start_datetime'].isoformat() + 'Z'},
-            'end':         {'dateTime': data['end_datetime'].isoformat()   + 'Z'},
+            'end':         {'dateTime': data['end_datetime'].isoformat() + 'Z'},
             'location':    data.get('location'),
             'attendees':   [{'email': u['uuid']} for u in data.get('registered_users', [])]
         }
         created_evt = calcli.create_event(new_cal['id'], event_body)
 
-        # 7) Metadata in DB opslaan
+        # 6) Metadata in DB opslaan
         time_created = new_cal.get('timeCreated')
         created_at = (datetime.fromisoformat(time_created.rstrip('Z'))
                       if time_created else datetime.utcnow())

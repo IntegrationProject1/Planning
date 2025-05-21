@@ -5,13 +5,18 @@ from datetime import datetime
 from dateutil import parser as dateparser
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from db_producer import DBClient
-from event_producer import QueueClient
+from event_producers.db_producer import DBClient
+from event_producers.event_producer import QueueClient
 
 print("app.py is gestart!", flush=True)
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar',  # Full access required for domain-wide delegation
+]
 SERVICE_ACCOUNT_FILE = 'credentials.json'
+
+# Indien vereist, te impersonaten gebruiker via domain-wide delegation
+IMPERSONATED_USER = os.getenv('IMPERSONATED_USER')
 
 MYSQL_CONFIG = {
     'host': os.environ['MYSQL_HOST'],
@@ -97,6 +102,9 @@ def main():
     print("Laden van Google Calendar credentials...", flush=True)
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    if IMPERSONATED_USER:
+        creds = creds.with_subject(IMPERSONATED_USER)
+        print(f"Credentials geimpersonateerd naar: {IMPERSONATED_USER}", flush=True)
     print("Credentials succesvol geladen", flush=True)
 
     print("Bouwen van Google Calendar service...", flush=True)
@@ -121,6 +129,7 @@ def main():
 
         if not existing:
             print(f"Nieuwe kalender gedetecteerd: {cal['uuid']}", flush=True)
+            cal['uuid'] = cal['uuid'].strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             db.insert(cal)
         else:
             changes = detect_changes(existing, cal)
@@ -129,8 +138,9 @@ def main():
                 db.update(cal, changes)
 
     for uuid in existing_uuids - current_uuids:
-        print(f"Kalender niet meer aanwezig, verwijderen: {uuid}", flush=True)
-        db.delete(uuid)
+        uuid_str = uuid.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        print(f"Kalender niet meer aanwezig, verwijderen: {uuid_str}", flush=True)
+        db.delete(uuid_str)
 
     db.commit()
     db.close()

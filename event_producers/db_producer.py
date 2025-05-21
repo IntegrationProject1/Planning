@@ -1,10 +1,6 @@
 import mysql.connector
 from datetime import datetime
-from xml_generator import (
-    build_event_xml,
-    build_update_xml,
-    build_delete_xml
-)
+from event_producers.xml_generator import build_event_xml, build_update_xml, build_delete_xml
 
 class DBClient:
     def __init__(self, config, queue_client):
@@ -41,7 +37,7 @@ class DBClient:
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS event_users (
                 event_uuid DATETIME(3) NOT NULL,
-                user_uuid VARCHAR(36) NOT NULL,
+                user_uuid VARCHAR(255) NOT NULL,
                 PRIMARY KEY (event_uuid, user_uuid),
                 FOREIGN KEY (event_uuid) REFERENCES calendars(uuid) ON DELETE CASCADE
             )

@@ -5,12 +5,12 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Kopieer requirements file en installeer dependencies
-COPY requirements.txt ./
+COPY ../requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kopieer de rest van de applicatie
-COPY . /app/
+COPY ../ ./
+
 ENV PYTHONPATH=/app
 
 # Start de app
-ENTRYPOINT ["python"]
+CMD ["python", "event_producers/app.py"]

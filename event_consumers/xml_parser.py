@@ -3,12 +3,12 @@ from datetime import datetime
 from typing import Dict, Any, List, Tuple
 
 _field_map = {
-    'UUID': 'uuid',
-    'Name': 'name',
-    'Description': 'description',
+    'EventUUID': 'uuid',
+    'EventName': 'name',
+    'EventDescription': 'description',
     'StartDateTime': 'start_datetime',
     'EndDateTime': 'end_datetime',
-    'Location': 'location',
+    'EventLocation': 'location',
     'Organisator': 'organizer',
     'Capacity': 'capacity',
     'EventType': 'event_type'
@@ -22,8 +22,8 @@ def _parse_iso_dt(text: str) -> datetime:
 
 def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
     root = ET.fromstring(xml_str)
-    if root.tag not in ('CreateEvent', 'Event'):
-        raise ValueError(f"Unexpected root element '{root.tag}', expected CreateEvent or Event")
+    if root.tag != 'CreateEvent':
+        raise ValueError(f"Unexpected root element '{root.tag}', expected CreateEvent")
     data: Dict[str, Any] = {}
 
     for elem in root:
@@ -31,7 +31,6 @@ def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
         if tag in _field_map:
             key = _field_map[tag]
             text = (elem.text or '').strip()
-            # Parse datetime-like fields (uuid, start, end)
             if key in ('uuid', 'start_datetime', 'end_datetime'):
                 data[key] = _parse_iso_dt(text)
             elif key == 'capacity':
@@ -51,7 +50,7 @@ def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
                 users.append(uid)
         data['registered_users'] = users
 
-    missing = [f for f in ('uuid', 'name', 'start_datetime', 'end_datetime',
+    missing = [f for f in ('uuid', 'name', 'description', 'start_datetime', 'end_datetime',
                        'location', 'organizer', 'capacity', 'event_type') if f not in data]
     if missing:
         raise ValueError(f"Missing required fields: {missing}")

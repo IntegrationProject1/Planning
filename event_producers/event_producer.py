@@ -21,6 +21,7 @@ class QueueClient:
         if isinstance(routing_keys, str):
             routing_keys = [routing_keys]
 
+        # ✅ Fix voor datetime serialisatie
         def default_serializer(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()

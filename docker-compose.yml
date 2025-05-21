@@ -4,7 +4,7 @@ services:
   event_producer:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: event_producers/Dockerfile
     ports:
       - "30017:30017"
     environment:
@@ -33,6 +33,30 @@ services:
     networks:
       - planning_network
 
+  session_producer:
+    build:
+      context: .
+      dockerfile: session_producers/Dockerfile
+    ports:
+      - "30015:30015"
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./xsd:/app/xsd:ro
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - planning_network
+      
   phpmyadmin:
     image: phpmyadmin
     environment:

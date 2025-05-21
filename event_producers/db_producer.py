@@ -1,5 +1,6 @@
 import mysql.connector
 from datetime import datetime
+from dateutil import parser as dateparser
 from event_producers.xml_generator import (
     build_event_xml,
     build_update_xml,
@@ -19,7 +20,7 @@ class DBClient:
         print("Aanmaken van 'calendars' tabel indien nodig...", flush=True)
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS calendars (
-                uuid VARCHAR(36) PRIMARY KEY,
+                uuid DATETIME PRIMARY KEY,
                 calendar_id VARCHAR(255),
                 name VARCHAR(255),
                 created_at DATETIME,
@@ -87,7 +88,13 @@ class DBClient:
                 last_fetched=%(last_fetched)s
             WHERE uuid=%(uuid)s
         """, data)
-        xml = build_update_xml(data["uuid"], changed_fields)
+
+        event_datetime = data["uuid"]
+        if isinstance(event_datetime, str):
+            event_datetime = dateparser.parse(event_datetime)
+
+        xml = build_update_xml(event_datetime, changed_fields)
+
         print(f"Versturen van 'updated' bericht voor UUID {data['uuid']}...", flush=True)
         self.queue.send(["crm.event.updated", "kassa.event.updated"], xml)
         print(f"Kalender met UUID {data['uuid']} bijgewerkt", flush=True)

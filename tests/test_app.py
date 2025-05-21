@@ -42,8 +42,8 @@ def test_detect_changes_detects_change():
     nieuw = dummy_event.copy()
     nieuw['capacity'] = 20
     resultaat = detect_changes(dummy_event, nieuw)
-    assert 'capacity' in resultaat
-    assert resultaat['capacity'] == 20
+    assert 'Capacity' in resultaat
+    assert resultaat['Capacity'] == 20
 
 @patch.dict(os.environ, ENV_VARS)
 def test_detect_changes_geen_wijziging():

@@ -18,7 +18,7 @@ dummy_event = {
 
 def test_build_event_xml():
     xml = build_event_xml(dummy_event)
-    assert "<Event>" in xml
+    assert "<CreateEvent>" in xml
     assert "<EventUUID>" in xml
     assert "<EventName>Test Event</EventName>" in xml
     assert "<Capacity>10</Capacity>" in xml

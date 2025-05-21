@@ -1,0 +1,89 @@
+.custom-extension {
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  
+    width: 100%;        
+    max-width: 352px;     
+    padding-left: 19px;  
+    padding-right: 10px;
+    box-sizing: border-box;
+  }
+  
+  
+  /* Floating label container */
+  .date-field {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  /* Invoervelden */
+  .custom-extension input {
+    padding: 20px 16px 8px 16px; /* top: ruimte voor label */
+    height: 56px;
+    border: none;
+    border-radius: 4px;
+    background-color: #e9eef6;
+    font-size: 14px;
+    color: #202124;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+  }
+  
+  /* Focus styling */
+  .custom-extension input:focus {
+    border: 2px solid #1a73e8;
+    background-color: #fff;
+  }
+  
+  /* Readonly */
+  .custom-extension input[readonly] {
+    background-color: #f1f3f4;
+    color: #5f6368;
+    cursor: not-allowed;
+  }
+  
+  /* Floating label */
+  .date-label {
+    position: absolute;
+    top: 18px;
+    left: 20px; /* 🔧 iets verder zodat het overeenkomt met tekstpositie */
+    font-size: 14px;
+    color: #5f6368;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    background: transparent;
+  }
+  
+  /* Label omhoog bij focus of waarde */
+  .custom-input:focus + .date-label,
+  .custom-input:not(:placeholder-shown) + .date-label {
+    top: 6px;
+    font-size: 11px;
+    left: 20px;
+    padding: 0 4px;
+  }
+  
+  /* Validatieboodschap */
+  .validation-error {
+    color: #d93025;
+    font-size: 12px;
+    margin-top: 4px;
+    margin-left: 2px;
+  }
+  
+  /* Verberg originele omschrijving */
+  textarea[aria-label="Omschrijving"],
+  textarea[jsname="YPqjbf"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+  

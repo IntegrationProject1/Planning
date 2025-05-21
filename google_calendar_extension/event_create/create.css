@@ -1,0 +1,41 @@
+.custom-extension-wrapper {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  background-color: #e9eef6; /* Google Calendar stijl */
+  font-family: "Roboto", Arial, sans-serif;
+  z-index: 1000;
+}
+
+.custom-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.custom-label {
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.custom-input,
+.custom-field textarea {
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  background-color: #e9eef6;
+}
+.custom-error {
+  color: red;
+  font-size: 12px;
+  margin-top: 4px;
+  display: none;
+}

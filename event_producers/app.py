@@ -5,12 +5,14 @@ from datetime import datetime
 from dateutil import parser as dateparser
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from db_producer import DBClient
-from event_producer import QueueClient
+from event_producers.db_producer import DBClient
+from event_producers.event_producer import QueueClient
+
 
 print("app.py is gestart!", flush=True)
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+# --- Configuratie ---
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 
 MYSQL_CONFIG = {
@@ -20,6 +22,7 @@ MYSQL_CONFIG = {
     'database': os.environ['MYSQL_DATABASE']
 }
 
+# --- Hulpfuncties ---
 def parse_date(date_str):
     if not date_str:
         return None
@@ -30,13 +33,17 @@ def parse_date(date_str):
     except Exception as e:
         print(f"Ongeldige datum '{date_str}': {e}", flush=True)
         return None
-
 def get_all_calendars(service):
     print("Ophalen van agenda-lijst...", flush=True)
     result = service.calendarList().list().execute()
     calendars = []
 
     for cal in result.get('items', []):
+        access_role = cal.get('accessRole', '')
+        if access_role not in ['owner', 'writer']:
+            print(f"Agenda overgeslagen (geen eigenaar of schrijver): {cal.get('summary')} - accessRole: {access_role}", flush=True)
+            continue  # Skip agendas zonder schrijf- of eigenaarsrechten
+
         raw_description = cal.get('description', '')
         print(f"Verwerken agenda: {cal.get('summary', '')} (ID: {cal['id']})", flush=True)
         try:
@@ -72,25 +79,40 @@ def get_all_calendars(service):
     print(f"Totaal {len(calendars)} geldige agenda's gevonden", flush=True)
     return calendars
 
-def detect_changes(old: dict, new: dict) -> dict:
-    changed = {}
-    fields = ['name', 'start_datetime', 'end_datetime', 'description',
-              'capacity', 'organizer', 'event_type', 'location']
 
-    for key in fields:
+def detect_changes(old: dict, new: dict) -> dict:
+    # Mapping van interne veldnamen naar XML/XSD veldnamen
+    field_map = {
+        'name': 'EventName',
+        'start_datetime': 'StartDateTime',
+        'end_datetime': 'EndDateTime',
+        'description': 'Description',
+        'capacity': 'Capacity',
+        'organizer': 'Organisator',
+        'event_type': 'EventType',
+        'location': 'EventLocation'
+    }
+
+    changed = {}
+    for key, xml_key in field_map.items():
         old_val = old.get(key)
         new_val = new.get(key)
         old_val_str = old_val.isoformat() if isinstance(old_val, datetime) else str(old_val or '')
         new_val_str = new_val.isoformat() if isinstance(new_val, datetime) else str(new_val or '')
         if old_val_str != new_val_str:
-            changed[key] = new_val
-            print(f"Wijziging gedetecteerd in veld '{key}': {old_val_str} -> {new_val_str}", flush=True)
+            changed[xml_key] = new_val
+            print(f"🔄 Wijziging gedetecteerd in veld '{xml_key}': {old_val_str} -> {new_val_str}", flush=True)
     return changed
+
 
 # --- Main ---
 def main():
     print("Laden van Google Calendar credentials...", flush=True)
-    creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE,
+        scopes=SCOPES
+    ).with_subject("contact@youmnimalha.be")  # <- Domain-wide delegation
+
     print("Credentials succesvol geladen", flush=True)
     print("Bouwen van Google Calendar service...", flush=True)
     service = build('calendar', 'v3', credentials=creds)
@@ -133,7 +155,7 @@ def main():
 if __name__ == "__main__":
     print("Event producer gestart!", flush=True)
     while True:
-        print(f"\n Nieuwe sync gestart om {datetime.utcnow().isoformat()} UTC", flush=True)
+        print(f"\n⏱Nieuwe sync gestart om {datetime.utcnow().isoformat()} UTC", flush=True)
         try:
             main()
         except Exception as e:

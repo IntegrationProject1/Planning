@@ -1,11 +1,12 @@
+// 🌐 Detecteer taal en haal vertalingen op
 const userLang = navigator.language.slice(0, 2);
 const t = window.translations[userLang] || window.translations["en"];
 
-console.log("Gedetecteerde taal:", navigator.language);
-console.log("Gebruikte taalcode:", userLang);
-console.log("Beschikbare vertalingen:", Object.keys(window.translations));
+console.log("🌐 Gedetecteerde taal:", navigator.language);
+console.log("🌐 Gebruikte taalcode:", userLang);
+console.log("🔍 Beschikbare vertalingen:", Object.keys(window.translations));
 
-console.log("Agenda Extender actief");
+console.log("📅 Agenda Extender actief");
 
 let hasInjected = false;
 let lastURL = location.href;
@@ -89,6 +90,7 @@ function injectUI(descriptionField, settingsBlock, createButton) {
 
   const inputs = {};
 
+  // Datumvelden
   const dateWrapper = document.createElement("div");
   dateWrapper.className = "date-wrapper";
 
@@ -107,8 +109,33 @@ function injectUI(descriptionField, settingsBlock, createButton) {
     input.type = "datetime-local";
     input.className = "custom-input";
 
+    const now = new Date();
+    const maxDate = new Date();
+    maxDate.setFullYear(now.getFullYear() + 5);
+    input.min = now.toISOString().slice(0, 16);
+    input.max = maxDate.toISOString().slice(0, 16);
+
+    const errorEl = document.createElement("div");
+    errorEl.className = "validation-error";
+    errorEl.style.display = "none";
+
     input.addEventListener("input", () => {
-      jsonData[key] = input.value ? new Date(input.value).toISOString() : "";
+      const selectedDate = new Date(input.value);
+      let showError = false;
+
+      if (selectedDate < now) {
+        errorEl.innerText = t.pastDateError || "De gekozen datum mag niet in het verleden liggen.";
+        showError = true;
+        input.value = "";
+      } else if (selectedDate > maxDate) {
+        errorEl.innerText = t.maxDateError || "De gekozen datum ligt meer dan 5 jaar in de toekomst.";
+        showError = true;
+        input.value = "";
+      } else {
+        jsonData[key] = input.value ? selectedDate.toISOString() : "";
+      }
+
+      errorEl.style.display = showError ? "block" : "none";
       updateDescription(descriptionField, jsonData);
       validateForm(inputs, requiredFields, createButton);
     });
@@ -116,11 +143,13 @@ function injectUI(descriptionField, settingsBlock, createButton) {
     inputs[key] = input;
     fieldWrapper.appendChild(labelEl);
     fieldWrapper.appendChild(input);
+    fieldWrapper.appendChild(errorEl);
     dateWrapper.appendChild(fieldWrapper);
   });
 
   container.appendChild(dateWrapper);
 
+  // Extra velden
   const fields = [
     { key: "description", type: "text", placeholder: t.description },
     { key: "capacity", type: "text", placeholder: t.capacity },
@@ -179,7 +208,7 @@ function injectUI(descriptionField, settingsBlock, createButton) {
     settingsBlock.appendChild(container);
   }
 
-  console.log("UI succesvol geïnjecteerd");
+  console.log("✅ UI succesvol geïnjecteerd");
 }
 
 function observeURLandInject() {
@@ -188,7 +217,7 @@ function observeURLandInject() {
     if (currentURL !== lastURL) {
       lastURL = currentURL;
       hasInjected = false;
-      console.log("Navigatie gedetecteerd:", currentURL);
+      console.log("🔄 Navigatie gedetecteerd:", currentURL);
     }
 
     if (currentURL.includes("/settings/createcalendar") && !hasInjected) {
@@ -196,7 +225,7 @@ function observeURLandInject() {
         const success = tryInjectUI();
         if (success) {
           clearInterval(injectInterval);
-          console.log("Injectie gelukt");
+          console.log("✅ Injectie gelukt");
         }
       }, 300);
     }

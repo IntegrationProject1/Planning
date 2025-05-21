@@ -1,15 +1,34 @@
 {
-    "manifest_version": 3,
-    "name": "Google Calendar Agenda Extender - By Youmni",
-    "version": "1.0",
-    "description": "Voegt extra velden toe bij het aanmaken van een nieuwe agenda in Google Calendar.",
-    "permissions": [],
-    "content_scripts": [
-      {
-        "matches": ["https://calendar.google.com/calendar/*"],
-        "js": ["translations.js", "content.js"],
-        "css": ["styles.css"]
-      }
-    ]
-  }
-  
+  "manifest_version": 3,
+  "name": "Google Calendar Extender",
+  "version": "1.0",
+  "description": "Voegt extra velden toe bij het aanmaken of bewerken van agenda's en evenementen.",
+  "permissions": [],
+  "host_permissions": ["https://calendar.google.com/"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://calendar.google.com/calendar/u*/r/settings/createcalendar*"
+      ],
+      "js": ["translations.js", "create/create.js"],
+      "css": ["create/create.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://calendar.google.com/calendar/u*/r/settings/editcalendar*"
+      ],
+      "js": ["translations.js", "edit/edit.js"],
+      "css": ["edit/edit.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://calendar.google.com/calendar/u*/r/eventedit*"
+      ],
+      "js": ["translations.js", "event_create/create.js"],
+      "css": ["event_create/create.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

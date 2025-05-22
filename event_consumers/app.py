@@ -17,11 +17,11 @@ SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
 IMPERSONATED_USER    = os.getenv('IMPERSONATED_USER')
 POLL_INTERVAL        = 60  # seconden
 
-# Luister alleen op planning-event queues
+# Luister alleen op underscore-queues i.p.v. dot-queues
 QUEUES = [
-    'planning.event.create',
-    'planning.event.update',
-    'planning.event.delete'
+    'planning_event_create',
+    'planning_event_update',
+    'planning_event_delete'
 ]
 
 def handle_message(routing_key: str, body: bytes):
@@ -41,15 +41,15 @@ def handle_message(routing_key: str, body: bytes):
         uuid_val = data['uuid']
         uuid_str = uuid_val.isoformat() + 'Z'
         payload = {
-            'uuid': uuid_str,
-            'createdAt': datetime.utcnow().isoformat() + 'Z',
+            'uuid':          uuid_str,
+            'createdAt':     datetime.utcnow().isoformat() + 'Z',
             'startDateTime': data['start_datetime'].isoformat() + 'Z',
-            'endDateTime': data['end_datetime'].isoformat() + 'Z',
-            'description': data['description'],
-            'capacity': data.get('capacity'),
-            'organizer': data.get('organisator') or data.get('organizer'),
-            'eventType': data.get('event_type') or data.get('eventType'),
-            'location': data.get('location')
+            'endDateTime':   data['end_datetime'].isoformat() + 'Z',
+            'description':   data['description'],
+            'capacity':      data.get('capacity'),
+            'organizer':     data.get('organisator') or data.get('organizer'),
+            'eventType':     data.get('event_type') or data.get('eventType'),
+            'location':      data.get('location')
         }
 
         # Maak kalender en event in Google Calendar
@@ -76,8 +76,8 @@ def handle_message(routing_key: str, body: bytes):
         created_at = (datetime.fromisoformat(time_created.rstrip('Z'))
                       if time_created else datetime.utcnow())
         db.update(data['uuid'], {
-            'calendar_id': new_cal['id'],
-            'created_at':  created_at,
+            'calendar_id':  new_cal['id'],
+            'created_at':   created_at,
             'last_fetched': datetime.utcnow()
         })
 
@@ -130,7 +130,6 @@ def handle_message(routing_key: str, body: bytes):
 
     db.commit()
     db.close()
-
 
 def main():
     print("Consumer gestart, verbinden met RabbitMQ...", flush=True)

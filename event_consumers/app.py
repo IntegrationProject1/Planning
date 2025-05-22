@@ -15,9 +15,8 @@ from event_consumers.calendar_client import CalendarClient
 # Configuratie via omgevingsvariabelen
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
 IMPERSONATED_USER    = os.getenv('IMPERSONATED_USER')
-POLL_INTERVAL        = 60  # seconden
+POLL_INTERVAL        = 6
 
-# Luister alleen op underscore-queues i.p.v. dot-queues
 QUEUES = [
     'planning_event_create',
     'planning_event_update',
@@ -52,32 +51,32 @@ def handle_message(routing_key: str, body: bytes):
             'location':      data.get('location')
         }
 
-        # Maak kalender en event in Google Calendar
+        # Maak kalender aan
         new_cal = calcli.create_calendar(
             summary=data['name'],
             description=json.dumps(payload)
         )
+
         calcli.subscribe_calendar(new_cal['id'])
 
-        event_body = {
-            'summary':     data['name'],
-            'description': data['description'],
-            'start':       {'dateTime': data['start_datetime'].isoformat() + 'Z'},
-            'end':         {'dateTime': data['end_datetime'].isoformat() + 'Z'},
-            'location':    data.get('location'),
-            'attendees': [
-                {'email': u['uuid']} if isinstance(u, dict) else {'email': u}
-                for u in data.get('registered_users', [])
-            ]
-        }
-        created_evt = calcli.create_event(new_cal['id'], event_body)
+        # Het event (blokje) zelf nooit zichtbaar
+        # event_body = {
+        #     'summary':     data['name'],
+        #     'description': data['description'],
+        #     'start':       {'dateTime': data['start_datetime'].isoformat() + 'Z'},
+        #     'end':         {'dateTime': data['end_datetime'].isoformat() + 'Z'},
+        #     'location':    data.get('location'),
+        #     'attendees': [
+        #         {'email': u['uuid']} if isinstance(u, dict) else {'email': u}
+        #         for u in data.get('registered_users', [])
+        #     ]
+        # }
+        # created_evt = calcli.create_event(new_cal['id'], event_body)
 
-        time_created = new_cal.get('timeCreated')
-        created_at = (datetime.fromisoformat(time_created.rstrip('Z'))
-                      if time_created else datetime.utcnow())
+        created_at = datetime.utcnow()
         db.update(data['uuid'], {
-            'calendar_id':  new_cal['id'],
-            'created_at':   created_at,
+            'calendar_id': new_cal['id'],
+            'created_at': created_at,
             'last_fetched': datetime.utcnow()
         })
 

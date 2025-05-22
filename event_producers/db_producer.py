@@ -68,7 +68,7 @@ class DBClient:
         """, data)
         xml = build_event_xml(data)
         print(f"Versturen van 'created' bericht voor UUID {data['uuid']}...", flush=True)
-        self.queue.send(["crm.event.created", "kassa.event.created"], xml)
+        self.queue.send(["crm.event.create", "kassa.event.create"], xml)
         print(f"Kalender met UUID {data['uuid']} ingevoegd", flush=True)
 
     def update(self, data: dict, changed_fields: dict):
@@ -96,7 +96,7 @@ class DBClient:
         xml = build_update_xml(event_datetime, changed_fields)
 
         print(f"Versturen van 'updated' bericht voor UUID {data['uuid']}...", flush=True)
-        self.queue.send(["crm.event.updated", "kassa.event.updated"], xml)
+        self.queue.send(["crm.event.update", "kassa.event.update"], xml)
         print(f"Kalender met UUID {data['uuid']} bijgewerkt", flush=True)
 
     def delete(self, uuid):
@@ -104,7 +104,7 @@ class DBClient:
         self.cursor.execute("DELETE FROM calendars WHERE uuid = %s", (uuid,))
         xml = build_delete_xml(uuid)
         print(f"Versturen van 'deleted' bericht voor UUID {uuid}...", flush=True)
-        self.queue.send(["crm.event.deleted", "kassa.event.deleted"], xml)
+        self.queue.send(["crm.event.delete", "kassa.event.delete"], xml)
         print(f"Kalender met UUID {uuid} verwijderd", flush=True)
 
     def commit(self):

@@ -7,36 +7,17 @@ on:
     branches: [ features_youmni ]
 
 jobs:
-  integration:
+  build:
+    name: Build & Test Planning App
     runs-on: ubuntu-latest
 
-    services:
-      rabbitmq:
-        image: rabbitmq:3-management
-        ports:
-          - 5672:5672
-          - 15672:15672
-      mysql:
-        image: mysql:5.7
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: test_db
-          MYSQL_USER: test_user
-          MYSQL_PASSWORD: test_pw
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-
     env:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: test_root_pw
       MYSQL_DATABASE: test_db
       MYSQL_USER: test_user
       MYSQL_PASSWORD: test_pw
-      MYSQL_HOST: localhost
+      MYSQL_HOST: mysql
+
       RABBITMQ_HOST: localhost
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: guest
@@ -44,42 +25,55 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.9
 
-      - name: Install Docker Compose
-        run: sudo apt-get update && sudo apt-get install -y docker-compose
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-order
 
-      - name: Start containers
-        run: docker-compose -f docker-compose.yml up -d --build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images
+        run: docker-compose -f docker-compose.ci.yml build
+
+      - name: Start Docker containers
+        run: docker-compose -f docker-compose.ci.yml up -d
 
       - name: Wait for MySQL
         run: |
           for i in {1..30}; do
-            nc -z localhost 3306 && echo "MySQL is ready" && break
+            nc -z localhost 3306 && echo "✅ MySQL ready" && break
             sleep 1
           done
 
       - name: Wait for RabbitMQ
         run: |
           for i in {1..30}; do
-            nc -z localhost 5672 && echo "RabbitMQ is ready" && break
+            nc -z localhost 5672 && echo "✅ RabbitMQ ready" && break
             sleep 1
           done
 
-      - name: Install requirements
-        run: pip install -r requirements.txt
+      - name: Wait for Flask API (session_producer)
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 30015 && echo "✅ Flask API ready" && break
+            sleep 1
+          done
 
-      - name: Run integration tests
-        run: pytest tests/integration
+      - name: Run tests
+        run: pytest tests/integration --tb=short -v
 
-      - name: Dump logs on failure
+      - name: Log containers on failure
         if: failure()
-        run: docker-compose logs
+        run: docker-compose -f docker-compose.ci.yml logs
 
-      - name: Stop containers
-        run: docker-compose -f docker-compose.yml down
+      - name: Shutdown containers
+        run: docker-compose -f docker-compose.ci.yml down

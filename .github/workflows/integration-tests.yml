@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and start containers
         run: |
-          docker-compose -f docker-compose.ci.yml up -d --build
+          docker compose -f docker-compose.ci.yml up -d --build
 
       - name: Wait for services to be ready
         run: |
@@ -54,11 +54,11 @@ jobs:
 
       - name: Run unit tests
         run: |
-          docker-compose -f docker-compose.ci.yml exec -T event_producer pytest -v
+          python3 -m pytest 
 
       - name: Show container logs on failure
         if: failure()
-        run: docker-compose -f docker-compose.ci.yml logs
+        run: docker compose -f docker-compose.ci.yml logs
 
       - name: Stop containers
-        run: docker-compose -f docker-compose.ci.yml down
+        run: docker compose -f docker-compose.ci.yml down

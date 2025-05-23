@@ -1,92 +1,75 @@
-version: "3.8"
+name: Integration Tests
 
-services:
-  event_producer:
-    build:
-      context: .
-      dockerfile: event_producers/Dockerfile
-    ports:
-      - "30017:30017"
-    environment:
-      - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - RABBITMQ_PORT=${RABBITMQ_PORT}
-      - RABBITMQ_USER=${RABBITMQ_USER}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-    volumes:
-      - ./credentials.json:/app/credentials.json:ro
-    depends_on:
-      - mysql
-    restart: unless-stopped
-    networks:
-      - planning_network
+on:
+  push:
+    branches: [ features_youmni ]
+  pull_request:
+    branches: [ features_youmni ]
 
-  mysql:
-    image: mysql:5.7
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    restart: unless-stopped
-    networks:
-      - planning_network
+jobs:
+  integration:
+    runs-on: ubuntu-latest
 
-  session_producer:
-    build:
-      context: .
-      dockerfile: session_producers/Dockerfile
-    ports:
-      - "30015:30015"
-    environment:
-      MYSQL_HOST: ${MYSQL_HOST}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-    volumes:
-      - ./credentials.json:/app/credentials.json:ro
-      - ./xsd:/app/xsd:ro
-    depends_on:
-      - mysql
-    restart: unless-stopped
-    networks:
-      - planning_network
-      
-  phpmyadmin:
-    image: phpmyadmin
-    environment:
-      PMA_HOST: mysql
-    ports:
-      - "30018:80"
-    restart: unless-stopped
-    networks:
-      - planning_network
+    env:
+      MYSQL_ROOT_PASSWORD=test_root_pw
+      MYSQL_DATABASE=test_db
+      MYSQL_USER=test_user
+      MYSQL_PASSWORD=test_user_pw
+      MYSQL_HOST=mysql
 
-  heartbeat:
-    build:
-      context: ./heartbeat
-      dockerfile: Dockerfile
-    container_name: planning_heartbeat
-    depends_on:
-      - event_producer
-    environment:
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-    restart: unless-stopped
-    networks:
-      - planning_network
+      RABBITMQ_HOST=localhost
+      RABBITMQ_PORT=5672
+      RABBITMQ_USER=guest
+      RABBITMQ_PASSWORD=guest
 
-networks:
-  planning_network:
-    name: planning_network
-    driver: bridge
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-volumes:
-  mysql_data:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
+
+      - name: Start full docker-compose stack
+        run: docker-compose -f docker-compose.yml up -d --build
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 3306 && echo "MySQL is ready" && break
+            sleep 1
+          done
+
+      - name: Wait for RabbitMQ
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 30020 && echo "RabbitMQ is ready" && break
+            sleep 1
+          done
+
+      - name: Wait for Flask API (session_producer)
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 30015 && echo "Flask API is ready" && break
+            sleep 1
+          done
+
+      - name: Install Python requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-order
+
+      - name: Run integration tests
+        run: pytest tests/integration
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker-compose logs
+
+      - name: Stop containers
+        run: docker-compose -f docker-compose.yml down

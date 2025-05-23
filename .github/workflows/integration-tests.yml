@@ -23,6 +23,18 @@ jobs:
       RABBITMQ_USER: guest
       RABBITMQ_PASSWORD: guest
 
+    services:
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q check_running"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,7 +69,7 @@ jobs:
       - name: Wait for RabbitMQ
         run: |
           for i in {1..30}; do
-            curl -u guest:guest http://localhost:30021/api/overview && echo "✅ RabbitMQ ready" && break
+            curl -u guest:guest http://localhost:15672/api/overview && echo "✅ RabbitMQ ready" && break
             sleep 2
           done || echo "RabbitMQ not responding"
 

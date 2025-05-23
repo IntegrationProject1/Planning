@@ -57,7 +57,7 @@ jobs:
       - name: Wait for RabbitMQ
         run: |
           for i in {1..30}; do
-            curl -u guest:guest http://localhost:15672/api/overview && echo "✅ RabbitMQ ready" && break
+            curl -u guest:guest http://localhost:30021/api/overview && echo "✅ RabbitMQ ready" && break
             sleep 2
           done || echo "RabbitMQ not responding"
 

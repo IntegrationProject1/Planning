@@ -4,7 +4,7 @@ import mysql.connector
 class DBClient:
     """
     Database client for consumer service.
-    Werkt met tabellen `calendars` en `registered_users`.
+    Werkt met tabellen `calendars` en `event_users`.
     """
     def __init__(self):
         config = {
@@ -39,12 +39,13 @@ class DBClient:
             `location` VARCHAR(255),
             `last_fetched` DATETIME
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """)
+        """
+        )
         print("Tabel 'calendars' gecontroleerd/aangemaakt", flush=True)
 
-        print("Aanmaken van 'registered_users' tabel indien nodig...", flush=True)
+        print("Aanmaken van 'event_users' tabel indien nodig...", flush=True)
         self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS `registered_users` (
+        CREATE TABLE IF NOT EXISTS `event_users` (
             `event_uuid` DATETIME NOT NULL,
             `user_uuid` VARCHAR(255) NOT NULL,
             PRIMARY KEY (`event_uuid`, `user_uuid`),
@@ -53,12 +54,13 @@ class DBClient:
               REFERENCES `calendars`(`uuid`)
               ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """)
-        print("Tabel 'registered_users' gecontroleerd/aangemaakt", flush=True)
+        """
+        )
+        print("Tabel 'event_users' gecontroleerd/aangemaakt", flush=True)
 
     def insert(self, data: dict):
         """
-        Insert of upsert van kalender en bijbehorende registered_users.
+        Insert of upsert van kalender en bijbehorende event_users.
         """
         print(f"Invoegen van nieuwe kalender (consumer) met UUID {data.get('uuid')}...", flush=True)
         cal_data = data.copy()
@@ -86,21 +88,21 @@ class DBClient:
 
         # Clear oude users
         self.cursor.execute(
-            "DELETE FROM `registered_users` WHERE `event_uuid` = %s",
+            "DELETE FROM `event_users` WHERE `event_uuid` = %s",
             (cal_data['uuid'],)
         )
 
-        # Insert nieuwe users
+        # Insert nieuwe event_users
         if users:
-            print(f"Invoegen van {len(users)} geregistreerde gebruikers...", flush=True)
-            ins_sql = "INSERT INTO `registered_users` (`event_uuid`,`user_uuid`) VALUES (%s,%s)"
+            print(f"Invoegen van {len(users)} event gebruikers...", flush=True)
+            ins_sql = "INSERT INTO `event_users` (`event_uuid`,`user_uuid`) VALUES (%s,%s)"
             for u in users:
                 user_uuid = u.get('uuid') if isinstance(u, dict) else u
                 self.cursor.execute(ins_sql, (cal_data['uuid'], user_uuid))
 
     def update(self, uuid, fields: dict):
         """
-        Update van kalender-velden en bijhorende users indien opgegeven.
+        Update van kalender-velden en bijbehorende event_users indien opgegeven.
         """
         print(f"Updaten van kalender (consumer) met UUID {uuid}...", flush=True)
         users = None
@@ -122,20 +124,20 @@ class DBClient:
             sql = f"UPDATE `calendars` SET {','.join(set_clauses)} WHERE `uuid`=%s"
             self.cursor.execute(sql, tuple(params))
 
-        # Users vervangen als nodig
+        # event_users vervangen als nodig
         if users is not None:
             self.cursor.execute(
-                "DELETE FROM `registered_users` WHERE `event_uuid`=%s",
+                "DELETE FROM `event_users` WHERE `event_uuid`=%s",
                 (uuid,)
             )
             if users:
-                ins_sql = "INSERT INTO `registered_users` (`event_uuid`,`user_uuid`) VALUES (%s,%s)"
+                ins_sql = "INSERT INTO `event_users` (`event_uuid`,`user_uuid`) VALUES (%s,%s)"
                 for u in users:
                     user_uuid = u.get('uuid') if isinstance(u, dict) else u
                     self.cursor.execute(ins_sql, (uuid, user_uuid))
 
     def delete(self, uuid):
-        """Verwijdert kalender en cascades naar registered_users."""
+        """Verwijdert kalender en cascades naar event_users."""
         print(f"Verwijderen van kalender (consumer) met UUID {uuid}...", flush=True)
         self.cursor.execute("DELETE FROM `calendars` WHERE `uuid`=%s", (uuid,))
 

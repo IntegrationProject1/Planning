@@ -72,6 +72,20 @@ services:
     restart: unless-stopped
     networks:
       - planning_network
+  
+  session_consumer:
+    build:
+      context: .
+      dockerfile: session_consumers/Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - planning_network
       
   phpmyadmin:
     image: phpmyadmin

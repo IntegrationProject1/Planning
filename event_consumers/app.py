@@ -15,7 +15,7 @@ from event_consumers.calendar_client import CalendarClient
 # Configuratie via omgevingsvariabelen
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'credentials.json')
 IMPERSONATED_USER    = os.getenv('IMPERSONATED_USER')
-POLL_INTERVAL        = 6
+POLL_INTERVAL        = 60
 
 QUEUES = [
     'planning_event_create',

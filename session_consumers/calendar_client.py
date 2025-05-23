@@ -1,57 +1,98 @@
 import os
 import sys
+import json
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from session_consumers.db_consumer import DBConsumer
 
 class CalendarClient:
     def __init__(self):
-        # Path to service account JSON key file
-        # Default path to mounted credentials.json, fallback if env var missing
         key_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '/app/credentials.json')
-        # No error if env var missing, we rely on default path
         if not os.path.isfile(key_path):
             raise RuntimeError(f"Service account JSON niet gevonden op {key_path}")
-
-        # User to impersonate (domain-wide delegation)
         subject = os.getenv('IMPERSONATED_USER')
         if not subject:
             raise RuntimeError('IMPERSONATED_USER is niet ingesteld')
 
-        # Load credentials and delegate
         creds = Credentials.from_service_account_file(
             key_path,
             scopes=['https://www.googleapis.com/auth/calendar']
         ).with_subject(subject)
 
         try:
-            self.service = build('calendar', 'v3', credentials=creds)
+            self.service = build('calendar', 'v3', credentials=creds, cache_discovery=False)
         except Exception as e:
             print(f"Fout bij initialiseren Calendar API: {e}", file=sys.stderr)
             raise
 
-    def create_session(self, calendar_id: str, event_body: dict) -> dict:
-        """
-        Create a new session event in Google Calendar.
-        """
+    def create_session(self, data: dict) -> dict:
+        # bepaal calendar_id (uit data of via DBConsumer)
+        cal_id = data.get('calendar_id')
+        if not cal_id:
+            db = DBConsumer()
+            cal_id = db.get_calendar_id_for_event(data['event_uuid'])
+            db.close()
+
+        # zet uuid om naar string
+        uid = data['session_uuid']
+        uuid_str = uid.isoformat() if hasattr(uid, 'isoformat') else str(uid)
+
+        # bouw JSON-payload: alleen guest speakers
+        payload = {
+            'uuid':         uuid_str,
+            'guestspeaker': data.get('guest_speaker', []),
+            'session_type': data.get('session_type'),
+            'capacity':     data.get('capacity'),
+            'description':  data.get('session_description')
+        }
+
+        # alleen geregistreerde gebruikers als attendees
+        attendees = [{'email': mail} for mail in data.get('registered_users', [])]
+
+        tz = os.getenv('CALENDAR_TIMEZONE', 'Europe/Brussels')
+        event = {
+            'summary':     data.get('session_name'),
+            'description': json.dumps(payload, indent=2),
+            'start':       {'dateTime': data['start_datetime'].isoformat(), 'timeZone': tz},
+            'end':         {'dateTime': data['end_datetime'].isoformat(),   'timeZone': tz},
+            'location':    data.get('session_location'),
+            'conferenceDataVersion': 0
+        }
+        if attendees:
+            event['attendees'] = attendees
+
         return self.service.events().insert(
-            calendarId=calendar_id,
-            body=event_body
+            calendarId=cal_id,
+            body=event,
+            conferenceDataVersion=0
         ).execute()
 
-    def update_session(self, calendar_id: str, event_id: str, event_body: dict) -> dict:
-        """
-        Update an existing session event in Google Calendar.
-        """
+    def update_session(self, data: dict, google_info: dict) -> dict:
+        # vergelijkbaar met create maar patch
+        uid = data['session_uuid']
+        uuid_str = uid.isoformat() if hasattr(uid, 'isoformat') else str(uid)
+
+        payload = {
+            'uuid':         uuid_str,
+            'guestspeaker': data.get('guest_speaker', []),
+            'session_type': data.get('session_type'),
+            'capacity':     data.get('capacity'),
+            'description':  data.get('session_description')
+        }
+
+        attendees = [{'email': mail} for mail in data.get('registered_users', [])]
+
+        body = {'description': json.dumps(payload, indent=2)}
+        if attendees:
+            body['attendees'] = attendees
+
         return self.service.events().patch(
-            calendarId=calendar_id,
-            eventId=event_id,
-            body=event_body
+            calendarId=google_info['google_calendar_id'],
+            eventId=google_info['google_event_id'],
+            body=body
         ).execute()
 
     def delete_session(self, calendar_id: str, event_id: str) -> None:
-        """
-        Delete a session event from Google Calendar.
-        """
         self.service.events().delete(
             calendarId=calendar_id,
             eventId=event_id

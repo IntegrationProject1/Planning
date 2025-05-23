@@ -2,13 +2,14 @@
 
 import mysql.connector
 import pytest
+import os
 from datetime import datetime
 
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "test_user",
-    "password": "test_pw",
-    "database": "test_db"
+    "host": os.getenv('MYSQL_HOST', 'localhost'),
+    "user": os.getenv('MYSQL_USER', 'test_user'),
+    "password": os.getenv('MYSQL_PASSWORD', 'test_pw'),
+    "database": os.getenv('MYSQL_DATABASE', 'test_db')
 }
 
 UUID = "test-uuid"

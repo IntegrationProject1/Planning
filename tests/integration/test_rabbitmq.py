@@ -1,7 +1,12 @@
 import pika
+import os
 
-credentials = pika.PlainCredentials('guest', 'guest')
-parameters = pika.ConnectionParameters('localhost', 5672, '/', credentials)
+rabbitmq_host = os.getenv('RABBITMQ_HOST', 'localhost')
+rabbitmq_user = os.getenv('RABBITMQ_USER', 'guest')
+rabbitmq_pass = os.getenv('RABBITMQ_PASS', 'guest')
+
+credentials = pika.PlainCredentials(rabbitmq_user, rabbitmq_pass)
+parameters = pika.ConnectionParameters(rabbitmq_host, 5672, '/', credentials)
 message_event = '<CreateEvent><EventUUID>evt-1</EventUUID><EventName>Test Event</EventName></CreateEvent>'
 message_session = '<CreateSession><SessionUUID>sess-1</SessionUUID><SessionName>Test Sessie</SessionName></CreateSession>'
 message_update = '<UpdateSession><SessionUUID>sess-1</SessionUUID><SessionName>Updated Sessie</SessionName></UpdateSession>'

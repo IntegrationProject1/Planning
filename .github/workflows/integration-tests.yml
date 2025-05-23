@@ -1,0 +1,85 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ features_youmni ]
+  pull_request:
+    branches: [ features_youmni ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+
+    services:
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          - 15672:15672
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_pw
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    env:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_pw
+      MYSQL_HOST: localhost
+      RABBITMQ_HOST: localhost
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
+
+      - name: Start containers
+        run: docker-compose -f docker-compose.yml up -d --build
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 3306 && echo "MySQL is ready" && break
+            sleep 1
+          done
+
+      - name: Wait for RabbitMQ
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 5672 && echo "RabbitMQ is ready" && break
+            sleep 1
+          done
+
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Run integration tests
+        run: pytest tests/integration
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker-compose logs
+
+      - name: Stop containers
+        run: docker-compose -f docker-compose.yml down

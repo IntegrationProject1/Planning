@@ -66,7 +66,7 @@ class DBClient:
         try:
             creds = service_account.Credentials.from_service_account_file(
                 SERVICE_ACCOUNT_FILE, scopes=SCOPES
-            ).with_subject("contact@youmnimalha.be")
+            ).with_subject("planning@youmnimalha.be")
 
             service = build('calendar', 'v3', credentials=creds)
             calendar = service.calendarList().get(calendarId=calendar_id).execute()

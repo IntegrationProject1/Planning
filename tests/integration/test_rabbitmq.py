@@ -3,7 +3,7 @@ import os
 
 rabbitmq_host = os.getenv('RABBITMQ_HOST')
 rabbitmq_user = os.getenv('RABBITMQ_USER')
-rabbitmq_pass = os.getenv('RABBITMQ_PASS')
+rabbitmq_pass = os.getenv('RABBITMQ_PASSWORD')
 
 credentials = pika.PlainCredentials(rabbitmq_user, rabbitmq_pass)
 parameters = pika.ConnectionParameters(rabbitmq_host, 5672, '/', credentials)

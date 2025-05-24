@@ -20,7 +20,7 @@ class DBClient:
         print("Aanmaken van 'calendars' tabel indien nodig...", flush=True)
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS calendars (
-                uuid DATETIME PRIMARY KEY,
+                uuid VARCHAR(255) PRIMARY KEY,
                 calendar_id VARCHAR(255),
                 name VARCHAR(255),
                 created_at DATETIME,

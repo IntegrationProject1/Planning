@@ -4,6 +4,17 @@ import json
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from session_consumers.db_consumer import DBConsumer
+from datetime import timezone  # nieuw: voor UTC-awareness
+
+# ─────────────────────────────────────────────────────────────────────────────
+def format_rfc3339ms(dt):
+    """Zet een datetime om naar RFC3339 met ms en 'Z' suffix."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc) \
+             .isoformat(timespec='milliseconds') \
+             .replace('+00:00', 'Z')
+# ─────────────────────────────────────────────────────────────────────────────
 
 class CalendarClient:
     def __init__(self):
@@ -26,18 +37,16 @@ class CalendarClient:
             raise
 
     def create_session(self, data: dict) -> dict:
-        # bepaal calendar_id (uit data of via DBConsumer)
         cal_id = data.get('calendar_id')
         if not cal_id:
             db = DBConsumer()
             cal_id = db.get_calendar_id_for_event(data['event_uuid'])
             db.close()
 
-        # zet uuid om naar string
+        # UUID omzetten naar ms+Z string
         uid = data['session_uuid']
-        uuid_str = uid.isoformat() if hasattr(uid, 'isoformat') else str(uid)
+        uuid_str = format_rfc3339ms(uid) if hasattr(uid, 'isoformat') else str(uid)
 
-        # bouw JSON-payload: alleen guest speakers
         payload = {
             'uuid':         uuid_str,
             'guestspeaker': data.get('guest_speaker', []),
@@ -46,7 +55,6 @@ class CalendarClient:
             'description':  data.get('session_description')
         }
 
-        # alleen geregistreerde gebruikers als attendees
         attendees = [{'email': mail} for mail in data.get('registered_users', [])]
 
         tz = os.getenv('CALENDAR_TIMEZONE', 'Europe/Brussels')
@@ -68,9 +76,8 @@ class CalendarClient:
         ).execute()
 
     def update_session(self, data: dict, google_info: dict) -> dict:
-        # vergelijkbaar met create maar patch
         uid = data['session_uuid']
-        uuid_str = uid.isoformat() if hasattr(uid, 'isoformat') else str(uid)
+        uuid_str = format_rfc3339ms(uid) if hasattr(uid, 'isoformat') else str(uid)
 
         payload = {
             'uuid':         uuid_str,

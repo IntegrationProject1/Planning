@@ -22,6 +22,9 @@ MYSQL_CONFIG = {
 }
 
 # --- Hulpfuncties ---
+def format_uuid(dt: datetime) -> str:
+    return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
 def parse_date(date_str):
     if not date_str:
         return None
@@ -60,7 +63,7 @@ def get_all_calendars(service):
         try:
             calendars.append({
                 # **UUID nu ook geparsed naar datetime**
-                'uuid':            parse_date(parsed.get('uuid')),
+                'uuid':            format_uuid(parse_date(parsed.get('uuid'))),
                 'calendar_id':     cal['id'],
                 'name':            cal.get('summary', ''),
                 'created_at':      parse_date(parsed.get('createdAt')),

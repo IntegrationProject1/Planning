@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, Tuple
 
 _field_map = {
     'EventUUID':       'uuid',
@@ -14,12 +14,13 @@ _field_map = {
     'EventType':       'event_type'
 }
 
+
 def _parse_iso_dt(text: str) -> datetime:
-    """Parse RFC3339 met ms+Z naar UTC-aware datetime."""
     s = (text or '').strip()
     if s.endswith('Z'):
         s = s[:-1] + '+00:00'
     return datetime.fromisoformat(s).astimezone(timezone.utc)
+
 
 def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
     root = ET.fromstring(xml_str)
@@ -33,7 +34,7 @@ def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
             key = _field_map[tag]
             txt = (elem.text or '').strip()
             if key == 'uuid':
-                data[key] = txt  # <<< AANGEPAST: GEEN PARSING, BEWAAR STRING
+                data[key] = txt
             elif key in ('start_datetime', 'end_datetime'):
                 data[key] = _parse_iso_dt(txt)
             elif key == 'capacity':
@@ -44,6 +45,7 @@ def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
             else:
                 data[key] = txt
 
+    # handle RegisteredUsers on create
     users = root.find('RegisteredUsers')
     if users is not None:
         data['registered_users'] = [
@@ -60,16 +62,16 @@ def parse_create_event_xml(xml_str: str) -> Dict[str, Any]:
 
     return data
 
+
 def parse_update_event_xml(xml_str: str) -> Tuple[str, Dict[str, Any]]:
-    print(f"[DEBUG] UUID tijdens update: {uuid}")
-    print(f"[DEBUG] Fields tijdens update: {fields}")
     root = ET.fromstring(xml_str)
     if root.tag != 'UpdateEvent':
         raise ValueError(f"Unexpected root '{root.tag}', expected UpdateEvent")
+
     raw = (root.findtext('EventUUID') or '').strip()
     if not raw:
         raise ValueError("Missing EventUUID")
-    uuid = raw  # <<< AANGEPAST: BEWAAR ALS STRING
+    uuid = raw
 
     fields: Dict[str, Any] = {}
     for tag in ('EventName','EventDescription','StartDateTime','EndDateTime',
@@ -87,7 +89,17 @@ def parse_update_event_xml(xml_str: str) -> Tuple[str, Dict[str, Any]]:
             else:
                 fields[key] = txt.strip()
 
+    # handle RegisteredUsers on update
+    users = root.find('RegisteredUsers')
+    if users is not None:
+        fields['registered_users'] = [
+            user.findtext('UUID').strip()
+            for user in users.findall('User')
+            if user.findtext('UUID')
+        ]
+
     return uuid, fields
+
 
 def parse_delete_event_xml(xml_str: str) -> str:
     root = ET.fromstring(xml_str)
@@ -96,4 +108,4 @@ def parse_delete_event_xml(xml_str: str) -> str:
     raw = (root.findtext('EventUUID') or '').strip()
     if not raw:
         raise ValueError("Missing EventUUID")
-    return raw  # <<< AANGEPAST: BEWAAR ALS STRING
+    return raw

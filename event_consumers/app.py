@@ -32,15 +32,16 @@ def handle_message(routing_key: str, body: bytes):
 
     if rk == 'planning.event.create':
         data = parse_create_event_xml(xml)
-        uuid_str = data['uuid']  # GEWIJZIGD: geen format_rfc3339ms
+        uuid_str = data['uuid']
 
+        # build the JSON description payload
         payload = {
             'uuid':          uuid_str,
             'createdAt':     format_rfc3339ms(datetime.utcnow()),
-            'startDateTime': data['start_datetime'].isoformat(),
-            'endDateTime':   data['end_datetime'].isoformat(),
+            'startDateTime': data['start_datetime'].isoformat() + 'Z',
+            'endDateTime':   data['end_datetime'].isoformat() + 'Z',
             'description':   data['description'],
-            'capacity':      data.get('capacity'),
+            'capacity':      str(data.get('capacity')),
             'organizer':     data.get('organisator'),
             'eventType':     data.get('event_type'),
             'location':      data.get('location')
@@ -54,47 +55,68 @@ def handle_message(routing_key: str, body: bytes):
 
         now = datetime.utcnow()
         data |= {
-            'uuid':         uuid_str,  # zorg dat dit zeker in data zit
             'calendar_id':  new_cal['id'],
             'created_at':   now,
             'last_fetched': now
         }
 
+        print(f"DEBUG data die wordt opgeslagen: {data}", flush=True)
         db.insert(data)
 
     elif rk == 'planning.event.update':
-        uid, fields = parse_update_event_xml(xml)
-        uuid_str = uid  # GEWIJZIGD: geen format_rfc3339ms
+        uuid_str, fields = parse_update_event_xml(xml)
 
+        # update our own DB first
         db.update(uuid_str, fields)
 
+        # now pull back the full row
         db.cursor.execute(
-            "SELECT calendar_id FROM calendars WHERE uuid = %s", (uuid_str,)
+            "SELECT uuid, calendar_id, name, created_at, start_datetime, end_datetime, "
+            "description, capacity, organizer, event_type, location "
+            "FROM calendars WHERE uuid = %s",
+            (uuid_str,)
         )
-        row = db.cursor.fetchone()
-        if row and ('start_datetime' in fields or 'end_datetime' in fields):
-            cal_id = row['calendar_id']
-            items = calcli.service.events().list(calendarId=cal_id).execute().get('items', [])
-            if items:
-                evt_id = items[0]['id']
-                body = {}
-                if 'start_datetime' in fields:
-                    body.setdefault('start', {})['dateTime'] = fields['start_datetime'].isoformat()
-                if 'end_datetime' in fields:
-                    body.setdefault('end', {})['dateTime'] = fields['end_datetime'].isoformat()
-                calcli.update_event(cal_id, evt_id, body)
+        rec = db.cursor.fetchone()
+        if not rec:
+            print(f"No DB record for UUID {uuid_str}", flush=True)
+            db.commit(); db.close()
+            return
 
+        # rebuild the JSON payload
+        payload = {
+            'uuid':          rec['uuid'],
+            'createdAt':     format_rfc3339ms(rec['created_at']),
+            'startDateTime': rec['start_datetime'].isoformat() + 'Z',
+            'endDateTime':   rec['end_datetime'].isoformat() + 'Z',
+            'description':   rec['description'],
+            'capacity':      str(rec['capacity']),
+            'organizer':     rec['organizer'],
+            'eventType':     rec['event_type'],
+            'location':      rec['location']
+        }
+        # update our fetched-timestamp
+        payload['lastFetched'] = format_rfc3339ms(datetime.utcnow())
+
+        # push the full JSON back into Calendar.description
+        calcli.service.calendars().update(
+            calendarId=rec['calendar_id'],
+            body={
+                'summary':     rec['name'],
+                'description': json.dumps(payload),
+                'timeZone':    'Europe/Brussels'
+            }
+        ).execute()
+
+        # finally update last_fetched in our DB
         db.update(uuid_str, {'last_fetched': datetime.utcnow()})
 
     elif rk == 'planning.event.delete':
-        uid = parse_delete_event_xml(xml)
-        uuid_str = uid  # GEWIJZIGD: geen format_rfc3339ms
+        uuid_str = parse_delete_event_xml(xml)
 
-        db.cursor.execute(
-            "SELECT calendar_id FROM calendars WHERE uuid = %s", (uuid_str,)
-        )
+        # pick up calendar_id so we can delete it
+        db.cursor.execute("SELECT calendar_id FROM calendars WHERE uuid = %s", (uuid_str,))
         row = db.cursor.fetchone()
-        if row:
+        if row and row.get('calendar_id'):
             calcli.delete_calendar(row['calendar_id'])
         db.delete(uuid_str)
 

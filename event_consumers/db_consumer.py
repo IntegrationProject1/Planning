@@ -62,19 +62,20 @@ class DBClient:
         cal_data['uuid'] = str(cal_data['uuid'])
 
         sql_cal = (
-            "INSERT INTO `calendars` (`uuid`,`name`,`description`,`start_datetime`,`end_datetime`,`location`,`organizer`,`capacity`,`event_type`) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "INSERT INTO `calendars` (`uuid`,`name`,`description`,`start_datetime`,`end_datetime`,`location`,`organizer`,`capacity`,`event_type`,`calendar_id`,`created_at`,`last_fetched`) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
             "ON DUPLICATE KEY UPDATE "
             "`name`=VALUES(`name`),`description`=VALUES(`description`),"
             "`start_datetime`=VALUES(`start_datetime`),`end_datetime`=VALUES(`end_datetime`),"
             "`location`=VALUES(`location`),`organizer`=VALUES(`organizer`),"
-            "`capacity`=VALUES(`capacity`),`event_type`=VALUES(`event_type`);"
-        )
+            "`capacity`=VALUES(`capacity`),`event_type`=VALUES(`event_type`),"
+            "`calendar_id`=VALUES(`calendar_id`),`created_at`=VALUES(`created_at`),`last_fetched`=VALUES(`last_fetched`);")
         print(f"DEBUG payload voor insert: {cal_data}", flush=True)
         self.cursor.execute(sql_cal, (
             cal_data['uuid'], cal_data['name'], cal_data['description'],
             cal_data['start_datetime'], cal_data['end_datetime'], cal_data['location'],
-            cal_data['organizer'], cal_data['capacity'], cal_data['event_type']
+            cal_data['organizer'], cal_data['capacity'], cal_data['event_type'],
+            cal_data.get('calendar_id'), cal_data.get('created_at'), cal_data.get('last_fetched')
         ))
 
         self.cursor.execute(

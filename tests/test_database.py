@@ -8,10 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DB_CONFIG = {
-    "host": os.getenv('MYSQL_HOST', 'localhost'),
-    "user": os.getenv('MYSQL_USER', 'test_user'),
-    "password": os.getenv('MYSQL_PASSWORD', 'test_pw'),
-    "database": os.getenv('MYSQL_DATABASE', 'test_db')
+    "host": os.getenv('MYSQL_HOST'),
+    "user": os.getenv('MYSQL_USER'),
+    "password": os.getenv('MYSQL_PASSWORD'),
+    "database": os.getenv('MYSQL_DATABASE')
 }
 
 UUID = "test-uuid"

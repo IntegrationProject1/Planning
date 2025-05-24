@@ -33,10 +33,10 @@ class QueueConsumer:
             durable=True
         )
 
-        # Queues declareren en binden
+        # Queues declareren en binden (underscore queue names, dot routing keys)
         self.queue_names = []
         for key in routing_keys:
-            queue_name = key
+            queue_name = key.replace('.', '_')
             self.channel.queue_declare(
                 queue=queue_name,
                 durable=True,
@@ -52,6 +52,11 @@ class QueueConsumer:
 
         self.callback = callback
         print(f"Listening on queues: {self.queue_names}", flush=True)
+
+    def _on_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        print(f"Received '{routing_key}' via push consumer", flush=True)
+        self.callback(routing_key, body)
 
     def poll_once(self):
         for queue in self.queue_names:
@@ -72,4 +77,21 @@ class QueueConsumer:
                 time.sleep(interval_seconds)
         except KeyboardInterrupt:
             print("Polling stopped by user", flush=True)
+            self.connection.close()
+
+    def start_consuming(self):
+        """
+        Push-based consumer: bind en begin met consumer loop.
+        """
+        for queue in self.queue_names:
+            self.channel.basic_consume(
+                queue=queue,
+                on_message_callback=self._on_message,
+                auto_ack=True
+            )
+        print(f"Starting push-based consuming on {self.queue_names}", flush=True)
+        try:
+            self.channel.start_consuming()
+        except KeyboardInterrupt:
+            print("Consuming stopped by user", flush=True)
             self.connection.close()

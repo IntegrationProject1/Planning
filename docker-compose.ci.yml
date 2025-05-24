@@ -80,8 +80,10 @@ services:
     volumes:
       - ./xsd:/app/xsd:ro
     depends_on:
-      - mysql
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      mysql:
+        condition: service_started
     restart: unless-stopped
     networks:
       - planning_network

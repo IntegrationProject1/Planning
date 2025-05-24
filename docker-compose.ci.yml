@@ -97,13 +97,13 @@ services:
     working_dir: /app
     environment:
       MYSQL_HOST: mysql
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_pw
       RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
     command: >
       sh -c "apt-get update &&
              apt-get install -y gcc libxml2-dev libxslt-dev default-libmysqlclient-dev curl &&
@@ -112,6 +112,7 @@ services:
              pytest tests/integration -v --tb=short"
     networks:
       - planning_network
+
 
 networks:
   planning_network:

@@ -1,17 +1,60 @@
-name: Python Build & Deploy
+name: CI Pipeline with Integration Tests & Deployment
 
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Build & Deploy to Server
+  integration-tests:
+    name: Run Integration Tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Deploy via SSH"
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: Create .env File
+        run: |
+          echo "MYSQL_ROOT_PASSWORD=test_root_pw" >> .env
+          echo "MYSQL_DATABASE=test_db" >> .env
+          echo "MYSQL_USER=test_user" >> .env
+          echo "MYSQL_PASSWORD=test_pw" >> .env
+          echo "MYSQL_HOST=mysql" >> .env
+          echo "RABBITMQ_HOST=rabbitmq" >> .env
+          echo "RABBITMQ_PORT=5672" >> .env
+          echo "RABBITMQ_USER=guest" >> .env
+          echo "RABBITMQ_PASSWORD=guest" >> .env
+
+      - name: Build and Run Tests in Containers
+        run: docker compose -f docker-compose.ci.yml up --abort-on-container-exit --exit-code-from test_runner
+
+      - name: Show Logs on Failure
+        if: failure()
+        run: docker compose -f docker-compose.ci.yml logs --tail=100
+
+      - name: Shut Down Containers
+        run: docker compose -f docker-compose.ci.yml down
+
+  deploy:
+    name: Deploy to Server
+    needs: integration-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Deploy to Production Server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}

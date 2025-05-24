@@ -1,0 +1,128 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - planning_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - planning_network
+
+  phpmyadmin:
+    image: phpmyadmin
+    environment:
+      PMA_HOST: mysql
+    ports:
+      - "30018:80"
+    restart: unless-stopped
+    networks:
+      - planning_network
+
+  event_producer:
+    build:
+      context: .
+      dockerfile: event_producers/Dockerfile
+    ports:
+      - "30017:30017"
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    depends_on:
+      - mysql
+      - rabbitmq
+    restart: unless-stopped
+    networks:
+      - planning_network
+
+  session_producer:
+    build:
+      context: .
+      dockerfile: session_producers/Dockerfile
+    ports:
+      - "30015:30015"
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./xsd:/app/xsd:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mysql:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - planning_network
+
+  test_runner:
+    image: python:3.9-slim
+    depends_on:
+      - mysql
+      - rabbitmq
+      - session_producer
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_pw
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+    command: >
+      sh -c "apt-get update &&
+            apt-get install -y gcc libxml2-dev libxslt-dev default-libmysqlclient-dev curl &&
+            pip install --no-cache-dir -r requirements.txt &&
+            echo '⏳ Wachten tot session_producer klaar is...' &&
+            until curl -s http://session_producer:30015/api/calendar-ping || sleep 2; do echo 'Nog niet klaar...'; done &&
+            echo 'session_producer is bereikbaar!' &&
+            pytest tests/integration -v --tb=short"
+
+    networks:
+      - planning_network
+
+
+networks:
+  planning_network:
+    name: planning_network
+    driver: bridge
+
+volumes:
+  mysql_data:

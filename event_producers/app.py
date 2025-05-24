@@ -8,7 +8,6 @@ from google.oauth2 import service_account
 from event_producers.db_producer import DBClient
 from event_producers.event_producer import QueueClient
 
-
 print("app.py is gestart!", flush=True)
 
 # --- Configuratie ---
@@ -16,10 +15,10 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 
 MYSQL_CONFIG = {
-    'host': os.environ['MYSQL_HOST'],
-    'user': os.environ['MYSQL_USER'],
-    'password': os.environ['MYSQL_PASSWORD'],
-    'database': os.environ['MYSQL_DATABASE']
+    'host': os.getenv('MYSQL_HOST'),
+    'user': os.getenv('MYSQL_USER'),
+    'password': os.getenv('MYSQL_PASSWORD'),
+    'database': os.getenv('MYSQL_DATABASE')
 }
 
 # --- Hulpfuncties ---
@@ -33,6 +32,7 @@ def parse_date(date_str):
     except Exception as e:
         print(f"Ongeldige datum '{date_str}': {e}", flush=True)
         return None
+
 def get_all_calendars(service):
     print("Ophalen van agenda-lijst...", flush=True)
     result = service.calendarList().list().execute()
@@ -42,7 +42,7 @@ def get_all_calendars(service):
         access_role = cal.get('accessRole', '')
         if access_role not in ['owner', 'writer']:
             print(f"Agenda overgeslagen (geen eigenaar of schrijver): {cal.get('summary')} - accessRole: {access_role}", flush=True)
-            continue  # Skip agendas zonder schrijf- of eigenaarsrechten
+            continue
 
         raw_description = cal.get('description', '')
         print(f"Verwerken agenda: {cal.get('summary', '')} (ID: {cal['id']})", flush=True)
@@ -59,18 +59,19 @@ def get_all_calendars(service):
 
         try:
             calendars.append({
-                'uuid': parsed['uuid'],
-                'calendar_id': cal['id'],
-                'name': cal.get('summary', ''),
-                'created_at': parse_date(parsed.get('createdAt')),
-                'start_datetime': parse_date(parsed.get('startDateTime')),
-                'end_datetime': parse_date(parsed.get('endDateTime')),
-                'description': parsed.get('description'),
-                'capacity': int(parsed.get('capacity') or 0),
-                'organizer': parsed.get('organizer'),
-                'event_type': parsed.get('eventType'),
-                'location': parsed.get('location'),
-                'last_fetched': datetime.utcnow()
+                # **UUID nu ook geparsed naar datetime**
+                'uuid':            parse_date(parsed.get('uuid')),
+                'calendar_id':     cal['id'],
+                'name':            cal.get('summary', ''),
+                'created_at':      parse_date(parsed.get('createdAt')),
+                'start_datetime':  parse_date(parsed.get('startDateTime')),
+                'end_datetime':    parse_date(parsed.get('endDateTime')),
+                'description':     parsed.get('description'),
+                'capacity':        int(parsed.get('capacity') or 0),
+                'organizer':       parsed.get('organizer'),
+                'event_type':      parsed.get('eventType'),
+                'location':        parsed.get('location'),
+                'last_fetched':    datetime.utcnow()
             })
             print(f"Agenda toegevoegd aan lijst: {cal.get('summary', '')}", flush=True)
         except Exception as e:
@@ -79,9 +80,7 @@ def get_all_calendars(service):
     print(f"Totaal {len(calendars)} geldige agenda's gevonden", flush=True)
     return calendars
 
-
 def detect_changes(old: dict, new: dict) -> dict:
-    # Mapping van interne veldnamen naar XML/XSD veldnamen
     field_map = {
         'name': 'EventName',
         'start_datetime': 'StartDateTime',
@@ -104,14 +103,13 @@ def detect_changes(old: dict, new: dict) -> dict:
             print(f"🔄 Wijziging gedetecteerd in veld '{xml_key}': {old_val_str} -> {new_val_str}", flush=True)
     return changed
 
-
 # --- Main ---
 def main():
     print("Laden van Google Calendar credentials...", flush=True)
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE,
         scopes=SCOPES
-    ).with_subject("contact@youmnimalha.be")  # <- Domain-wide delegation
+    ).with_subject("contact@youmnimalha.be")
 
     print("Credentials succesvol geladen", flush=True)
     print("Bouwen van Google Calendar service...", flush=True)

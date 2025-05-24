@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: event_producers/Dockerfile
+    env_file:
+      - .env
     ports:
       - "30017:30017"
     environment:
@@ -17,6 +19,20 @@ services:
     depends_on:
       - mysql
     restart: unless-stopped
+    networks:
+      - planning_network
+  
+  event_consumer:
+    build:
+      context: .
+      dockerfile: event_consumers/Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+    restart: unless-stopped
+    depends_on:
+      - mysql
     networks:
       - planning_network
 

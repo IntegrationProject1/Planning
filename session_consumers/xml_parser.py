@@ -2,7 +2,12 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 def _iso(s: str) -> datetime:
-    # jouw formaat: 2025-06-15T13:00:00
+    # Ondersteun zowel zonder als met 'Z' (UTC) suffix
+    if s is None:
+        return None
+    # Vervang trailing Z door +00:00 voor fromisoformat
+    if s.endswith('Z'):
+        s = s[:-1] + '+00:00'
     return datetime.fromisoformat(s)
 
 def parse_create_session_xml(body: bytes) -> dict:
@@ -43,11 +48,26 @@ def parse_update_session_xml(body: bytes) -> dict:
     root = ET.fromstring(body)
     session_uuid = root.findtext('SessionUUID')
     changes = {}
-    # vul changes dict indien aanwezig; voorbeeld:
-    if root.find('SessionName') is not None:
-        changes['session_name'] = root.findtext('SessionName')
-    # herhaal voor andere velden...
-    # Guests & RegisteredUsers net als create:
+    # vul changes dict indien aanwezig
+    for tag, key in [
+        ('SessionName', 'session_name'),
+        ('SessionDescription', 'session_description'),
+        ('StartDateTime', 'start_datetime'),
+        ('EndDateTime', 'end_datetime'),
+        ('SessionLocation', 'session_location'),
+        ('SessionType', 'session_type'),
+        ('Capacity', 'capacity')
+    ]:
+        elem = root.find(tag)
+        if elem is not None and elem.text:
+            val = elem.text
+            if 'DateTime' in tag:
+                val = _iso(val)
+            elif tag == 'Capacity':
+                val = int(val)
+            changes[key] = val
+    
+    # Guests & RegisteredUsers
     gs = root.find('GuestSpeakers')
     if gs is not None:
         changes['guest_speaker'] = [g.findtext('email') for g in gs.findall('GuestSpeaker') if g.findtext('email')]

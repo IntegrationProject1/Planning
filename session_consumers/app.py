@@ -1,8 +1,5 @@
 import logging
 import pika
-import os
-import json
-import time
 from session_consumers.config import (
     RABBIT_HOST, RABBIT_PORT, RABBIT_USER, RABBIT_PASS,
     EXCHANGE_NAME, QUEUES
@@ -35,9 +32,7 @@ def handle_create(ch, method, properties, body):
         data.get('guest_speaker', []),
         data.get('registered_users', [])
     )
-    # minimale aanpassing: zorg dat calendar_id in data staat
     data['calendar_id'] = db.get_calendar_id_for_event(data['event_uuid'])
-    # maak de Calendar-entry
     calcli = CalendarClient()
     google = calcli.create_session(data)
     db.save_google_info(
@@ -115,21 +110,25 @@ def main():
 
     channel.basic_qos(prefetch_count=1)
 
-    logger.info(f"[*] Session consumer gestart (1 pull per 60s)")
-    POLL_INTERVAL = 60
-    while True:
-        for op, handler in [
-            ('create', handle_create),
-            ('update', handle_update),
-            ('delete', handle_delete),
-        ]:
-            method, props, body = channel.basic_get(
-                queue=QUEUES[op]['queue'],
-                auto_ack=False
-            )
-            if method:
-                handler(channel, method, props, body)
-        time.sleep(POLL_INTERVAL)
+    # Start consumers voor elke queue
+    channel.basic_consume(
+        queue=QUEUES['create']['queue'],
+        on_message_callback=handle_create,
+        auto_ack=False
+    )
+    channel.basic_consume(
+        queue=QUEUES['update']['queue'],
+        on_message_callback=handle_update,
+        auto_ack=False
+    )
+    channel.basic_consume(
+        queue=QUEUES['delete']['queue'],
+        on_message_callback=handle_delete,
+        auto_ack=False
+    )
+
+    logger.info("[*] Session consumer gestart met event-driven verwerking via RabbitMQ")
+    channel.start_consuming()
 
 if __name__ == '__main__':
     main()

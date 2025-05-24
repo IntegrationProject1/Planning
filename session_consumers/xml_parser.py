@@ -8,7 +8,7 @@ def _iso(s: str) -> datetime:
 def parse_create_session_xml(body: bytes) -> dict:
     root = ET.fromstring(body)
     data = {
-        'session_uuid':       _iso(root.findtext('SessionUUID')),
+        'session_uuid':       root.findtext('SessionUUID'),
         'event_uuid':         root.findtext('EventUUID'),
         'session_name':       root.findtext('SessionName'),
         'session_description': root.findtext('SessionDescription'),

@@ -1,9 +1,9 @@
-# tests/integration/test_api.py
 import requests
 import json
 import pytest
 
-BASE_URL = "http://localhost:30015"
+# Gebruik de service-naam van de container als hostname binnen Docker netwerk
+BASE_URL = "http://session_producer:30015"
 UUID = "2025-05-22T15:00:00"
 
 @pytest.mark.order(1)

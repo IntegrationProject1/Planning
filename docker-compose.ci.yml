@@ -106,10 +106,13 @@ services:
       RABBITMQ_PASSWORD: guest
     command: >
       sh -c "apt-get update &&
-             apt-get install -y gcc libxml2-dev libxslt-dev default-libmysqlclient-dev curl &&
-             pip install --no-cache-dir -r requirements.txt &&
-             sleep 10 &&
-             pytest tests/integration -v --tb=short"
+            apt-get install -y gcc libxml2-dev libxslt-dev default-libmysqlclient-dev curl &&
+            pip install --no-cache-dir -r requirements.txt &&
+            echo '⏳ Wachten tot session_producer klaar is...' &&
+            until curl -s http://session_producer:30015/api/calendar-ping || sleep 2; do echo 'Nog niet klaar...'; done &&
+            echo '✅ session_producer is bereikbaar!' &&
+            pytest tests/integration -v --tb=short"
+
     networks:
       - planning_network
 

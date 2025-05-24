@@ -4,6 +4,8 @@ import mysql.connector
 import pytest
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
 DB_CONFIG = {
     "host": os.getenv('MYSQL_HOST', 'localhost'),

@@ -1,5 +1,5 @@
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil import parser as dateparser
 from event_producers.xml_generator import (
     build_event_xml,
@@ -39,24 +39,28 @@ class DBClient:
 
     def _ensure_datetime(self, value, precision='micro'):
         if isinstance(value, datetime):
-            return value
-        try:
-            dt = dateparser.parse(value)
-            if precision == 'millis':
-                return dt.replace(microsecond=(dt.microsecond // 1000) * 1000)
-            return dt
-        except Exception as e:
-            print(f"⚠️ Kan '{value}' niet omzetten naar datetime: {e}", flush=True)
-            return None
+            dt = value
+        else:
+            try:
+                dt = dateparser.parse(value)
+            except Exception as e:
+                print(f"⚠️ Kan '{value}' niet omzetten naar datetime: {e}", flush=True)
+                return None
+
+        if precision == 'millis':
+            return dt.replace(microsecond=(dt.microsecond // 1000) * 1000)
+        return dt
 
     def _format_uuid(self, value):
-        """Zet datetime of string om naar standaard UUID-formaat: ISO met milliseconden en 'Z'."""
+        """Zet datetime of string om naar ISO-formaat met microseconden en 'Z'."""
         try:
             dt = self._ensure_datetime(value, precision='micro')
-            return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            if dt is None:
+                return str(value)
+            return dt.astimezone(timezone.utc).isoformat(timespec='microseconds').replace('+00:00', 'Z')
         except Exception as e:
-            print(f"⚠️ Kan '{value}' niet formatteren als UUID: {e}", flush=True)
-            return value
+            print(f"⚠️ Kan '{value}' niet formatteren als UUID-string: {e}", flush=True)
+            return str(value)
 
     def get_all_uuids(self):
         print("Ophalen van alle UUID's uit de database...", flush=True)

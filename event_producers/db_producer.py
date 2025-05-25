@@ -7,6 +7,7 @@ from event_producers.xml_generator import (
     build_delete_xml
 )
 
+
 class DBClient:
     def __init__(self, config, queue_client):
         print("Initialiseren van MySQL-verbinding...", flush=True)
@@ -23,9 +24,9 @@ class DBClient:
                 uuid VARCHAR(255) PRIMARY KEY,
                 calendar_id VARCHAR(255),
                 name VARCHAR(255),
-                created_at DATETIME,
-                start_datetime DATETIME,
-                end_datetime DATETIME,
+                created_at DATETIME(6),
+                start_datetime DATETIME(3),
+                end_datetime DATETIME(3),
                 description TEXT,
                 capacity INT,
                 organizer VARCHAR(255),
@@ -34,7 +35,19 @@ class DBClient:
                 last_fetched DATETIME
             )
         """)
-        print("Tabel 'calendars' gecontroleerd/ aangemaakt", flush=True)
+        print("Tabel 'calendars' gecontroleerd/aangemaakt", flush=True)
+
+    def _ensure_datetime(self, value, precision='micro'):
+        if isinstance(value, datetime):
+            return value
+        try:
+            dt = dateparser.parse(value)
+            if precision == 'millis':
+                return dt.replace(microsecond=(dt.microsecond // 1000) * 1000)
+            return dt
+        except Exception as e:
+            print(f"⚠️ Kan '{value}' niet omzetten naar datetime: {e}", flush=True)
+            return None
 
     def get_all_uuids(self):
         print("Ophalen van alle UUID's uit de database...", flush=True)
@@ -57,6 +70,14 @@ class DBClient:
 
     def insert(self, data: dict):
         print(f"Invoegen van nieuwe kalender met UUID {data['uuid']}...", flush=True)
+
+        # ✅ Zet alle datums om naar datetime-objecten
+        data['uuid'] = self._ensure_datetime(data['uuid'], precision='micro')
+        data['created_at'] = self._ensure_datetime(data.get('created_at'), precision='micro')
+        data['start_datetime'] = self._ensure_datetime(data.get('start_datetime'), precision='millis')
+        data['end_datetime'] = self._ensure_datetime(data.get('end_datetime'), precision='millis')
+        data['last_fetched'] = self._ensure_datetime(data.get('last_fetched'))
+
         self.cursor.execute("""
             INSERT INTO calendars (
                 uuid, calendar_id, name, created_at, start_datetime, end_datetime,
@@ -66,6 +87,7 @@ class DBClient:
                       %(capacity)s, %(organizer)s, %(event_type)s, %(location)s,
                       %(last_fetched)s)
         """, data)
+
         xml = build_event_xml(data)
         print(f"Versturen van 'created' bericht voor UUID {data['uuid']}...", flush=True)
         self.queue.send(["crm.event.create", "kassa.event.create"], xml)
@@ -73,6 +95,14 @@ class DBClient:
 
     def update(self, data: dict, changed_fields: dict):
         print(f"Updaten van kalender met UUID {data['uuid']}...", flush=True)
+
+        # ✅ Zorg dat uuid correct is
+        data['uuid'] = self._ensure_datetime(data['uuid'], precision='micro')
+        data['created_at'] = self._ensure_datetime(data.get('created_at'), precision='micro')
+        data['start_datetime'] = self._ensure_datetime(data.get('start_datetime'), precision='millis')
+        data['end_datetime'] = self._ensure_datetime(data.get('end_datetime'), precision='millis')
+        data['last_fetched'] = self._ensure_datetime(data.get('last_fetched'))
+
         self.cursor.execute("""
             UPDATE calendars SET
                 calendar_id=%(calendar_id)s,
@@ -89,12 +119,7 @@ class DBClient:
             WHERE uuid=%(uuid)s
         """, data)
 
-        event_datetime = data["uuid"]
-        if isinstance(event_datetime, str):
-            event_datetime = dateparser.parse(event_datetime)
-
-        xml = build_update_xml(event_datetime, changed_fields)
-
+        xml = build_update_xml(data['uuid'], changed_fields)
         print(f"Versturen van 'updated' bericht voor UUID {data['uuid']}...", flush=True)
         self.queue.send(["crm.event.update", "kassa.event.update"], xml)
         print(f"Kalender met UUID {data['uuid']} bijgewerkt", flush=True)

@@ -225,7 +225,7 @@ function injectUI(descriptionField, settingsBlock, createButton) {
     settingsBlock.appendChild(container);
   }
 
-  console.log("✅ UI succesvol geïnjecteerd");
+  console.log("UI succesvol geïnjecteerd");
 }
 
 function observeURLandInject() {
@@ -234,7 +234,7 @@ function observeURLandInject() {
     if (currentURL !== lastURL) {
       lastURL = currentURL;
       hasInjected = false;
-      console.log("🔄 Navigatie gedetecteerd:", currentURL);
+      console.log("Navigatie gedetecteerd:", currentURL);
     }
 
     if (currentURL.includes("/settings/createcalendar") && !hasInjected) {
@@ -242,7 +242,7 @@ function observeURLandInject() {
         const success = tryInjectUI();
         if (success) {
           clearInterval(injectInterval);
-          console.log("✅ Injectie gelukt");
+          console.log("Injectie gelukt");
         }
       }, 300);
     }

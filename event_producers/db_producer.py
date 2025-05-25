@@ -49,6 +49,15 @@ class DBClient:
             print(f"⚠️ Kan '{value}' niet omzetten naar datetime: {e}", flush=True)
             return None
 
+    def _format_uuid(self, value):
+        """Zet datetime of string om naar standaard UUID-formaat: ISO met milliseconden en 'Z'."""
+        try:
+            dt = self._ensure_datetime(value, precision='micro')
+            return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        except Exception as e:
+            print(f"⚠️ Kan '{value}' niet formatteren als UUID: {e}", flush=True)
+            return value
+
     def get_all_uuids(self):
         print("Ophalen van alle UUID's uit de database...", flush=True)
         self.cursor.execute("SELECT uuid FROM calendars")
@@ -57,6 +66,7 @@ class DBClient:
         return uuids
 
     def get_by_uuid(self, uuid):
+        uuid = self._format_uuid(uuid)
         print(f"Ophalen van kalender met UUID {uuid}...", flush=True)
         self.cursor.execute("SELECT * FROM calendars WHERE uuid = %s", (uuid,))
         row = self.cursor.fetchone()
@@ -69,10 +79,9 @@ class DBClient:
         return result
 
     def insert(self, data: dict):
+        data['uuid'] = self._format_uuid(data['uuid'])
         print(f"Invoegen van nieuwe kalender met UUID {data['uuid']}...", flush=True)
 
-        # ✅ Zet alle datums om naar datetime-objecten
-        data['uuid'] = self._ensure_datetime(data['uuid'], precision='micro')
         data['created_at'] = self._ensure_datetime(data.get('created_at'), precision='micro')
         data['start_datetime'] = self._ensure_datetime(data.get('start_datetime'), precision='millis')
         data['end_datetime'] = self._ensure_datetime(data.get('end_datetime'), precision='millis')
@@ -94,10 +103,9 @@ class DBClient:
         print(f"Kalender met UUID {data['uuid']} ingevoegd", flush=True)
 
     def update(self, data: dict, changed_fields: dict):
+        data['uuid'] = self._format_uuid(data['uuid'])
         print(f"Updaten van kalender met UUID {data['uuid']}...", flush=True)
 
-        # ✅ Zorg dat uuid correct is
-        data['uuid'] = self._ensure_datetime(data['uuid'], precision='micro')
         data['created_at'] = self._ensure_datetime(data.get('created_at'), precision='micro')
         data['start_datetime'] = self._ensure_datetime(data.get('start_datetime'), precision='millis')
         data['end_datetime'] = self._ensure_datetime(data.get('end_datetime'), precision='millis')
@@ -125,6 +133,7 @@ class DBClient:
         print(f"Kalender met UUID {data['uuid']} bijgewerkt", flush=True)
 
     def delete(self, uuid):
+        uuid = self._format_uuid(uuid)
         print(f"Verwijderen van kalender met UUID {uuid}...", flush=True)
         self.cursor.execute("DELETE FROM calendars WHERE uuid = %s", (uuid,))
         xml = build_delete_xml(uuid)

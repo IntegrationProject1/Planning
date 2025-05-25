@@ -32,7 +32,6 @@ def build_event_xml(data: dict) -> str:
 def build_update_xml(event_datetime: datetime, changed_fields: dict) -> str:
     root = ET.Element("UpdateEvent")
 
-    # Ensure trailing Z on UUID
     ET.SubElement(root, "EventUUID").text = event_datetime.isoformat() + 'Z'
 
     for name, new_value in changed_fields.items():
@@ -40,7 +39,6 @@ def build_update_xml(event_datetime: datetime, changed_fields: dict) -> str:
             users_elem = ET.SubElement(root, "RegisteredUsers")
             for user in new_value:
                 user_elem = ET.SubElement(users_elem, "User")
-                # Switch email tag to UUID
                 ET.SubElement(user_elem, "UUID").text = user
         else:
             value = new_value.isoformat() if isinstance(new_value, datetime) else str(new_value)

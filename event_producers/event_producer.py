@@ -21,19 +21,24 @@ class QueueClient:
         if isinstance(routing_keys, str):
             routing_keys = [routing_keys]
 
-        # ✅ Fix voor datetime serialisatie
-        def default_serializer(obj):
-            if isinstance(obj, datetime):
-                return obj.isoformat()
-            return str(obj)
+        if isinstance(message, dict):
+            def default_serializer(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                return str(obj)
+            body = json.dumps(message, default=default_serializer)
+        elif isinstance(message, str):
+            body = message
+        else:
+            raise TypeError("Message moet een dict of string zijn")
 
-        body = json.dumps(message, default=default_serializer)
+        body_bytes = body.encode('utf-8')
 
         for key in routing_keys:
             self.channel.basic_publish(
                 exchange=self.exchange,
                 routing_key=key,
-                body=body,
+                body=body_bytes,
                 properties=pika.BasicProperties(delivery_mode=2)
             )
             print(f"Verzonden naar '{key}': {body}", flush=True)

@@ -5,11 +5,28 @@ const t = window.translations[userLang] || window.translations["en"];
 console.log("🌐 Gedetecteerde taal:", navigator.language);
 console.log("🌐 Gebruikte taalcode:", userLang);
 console.log("🔍 Beschikbare vertalingen:", Object.keys(window.translations));
-
 console.log("📅 Agenda Extender actief");
 
 let hasInjected = false;
 let lastURL = location.href;
+
+
+function formatToMilliseconds(date) {
+  const iso = date.toISOString();
+  return iso.replace(/\.\d+Z$/, '.000Z');
+}
+
+
+function formatToMicroseconds(date) {
+  const iso = date.toISOString(); // "2025-05-25T17:05:29.129Z"
+  const match = iso.match(/^(.+\.\d{3})Z$/); // match exacte vorm met 3 ms
+  if (match) {
+    return `${match[1]}000Z`; // voeg 3 nullen toe vóór de Z
+  } else {
+    return iso.replace('Z', '000Z'); // fallback als geen match
+  }
+}
+
 
 function updateDescription(textarea, data) {
   textarea.value = JSON.stringify(data, null, 2);
@@ -67,8 +84,8 @@ function injectUI(descriptionField, settingsBlock, createButton) {
   container.className = "custom-extension";
 
   const jsonData = {
-    uuid: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
+    uuid: formatToMicroseconds(new Date()),
+    createdAt: formatToMicroseconds(new Date()),
     startDateTime: "",
     endDateTime: "",
     description: "",
@@ -120,7 +137,7 @@ function injectUI(descriptionField, settingsBlock, createButton) {
     errorEl.style.display = "none";
 
     input.addEventListener("input", () => {
-      const selectedDate = new Date(input.value);
+      const selectedDate = new Date(input.valueAsNumber);
       let showError = false;
 
       if (selectedDate < now) {
@@ -132,7 +149,7 @@ function injectUI(descriptionField, settingsBlock, createButton) {
         showError = true;
         input.value = "";
       } else {
-        jsonData[key] = input.value ? selectedDate.toISOString() : "";
+        jsonData[key] = input.value ? formatToMilliseconds(selectedDate) : "";
       }
 
       errorEl.style.display = showError ? "block" : "none";

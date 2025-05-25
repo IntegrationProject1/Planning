@@ -1,8 +1,6 @@
 name: CI Pipeline with Integration Tests & Deployment
 
 on:
-  push:
-    branches: ["main"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:

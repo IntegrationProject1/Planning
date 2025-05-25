@@ -62,10 +62,10 @@ def get_all_calendars(service):
 
         try:
             calendars.append({
-                'uuid': format_uuid(parse_date(parsed.get('uuid'))),
-                'calendar_id': cal['id'],   # Zorg dat dit altijd aanwezig is!
+                'uuid': parsed.get('uuid'),
+                'calendar_id': cal['id'],
                 'name': cal.get('summary', ''),
-                'created_at': parse_date(parsed.get('createdAt')),  # check of 'createdAt' altijd in JSON zit
+                'created_at': parse_date(parsed.get('createdAt')),
                 'start_datetime': parse_date(parsed.get('startDateTime')),
                 'end_datetime': parse_date(parsed.get('endDateTime')),
                 'description': parsed.get('description'),
@@ -73,7 +73,7 @@ def get_all_calendars(service):
                 'organizer': parsed.get('organizer'),
                 'event_type': parsed.get('eventType'),
                 'location': parsed.get('location'),
-                'last_fetched': datetime.utcnow()  # altijd vullen met current UTC time
+                'last_fetched': datetime.utcnow()
             })
             print(f"Agenda toegevoegd aan lijst: {cal.get('summary', '')}", flush=True)
         except Exception as e:

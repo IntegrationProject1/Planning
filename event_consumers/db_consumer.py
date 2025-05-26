@@ -42,12 +42,8 @@ class DBClient:
         self.cursor.execute("""
         CREATE TABLE IF NOT EXISTS `event_users` (
             `event_uuid` VARCHAR(255) NOT NULL,
-            `user_uuid` VARCHAR(255) NOT NULL,
-            PRIMARY KEY (`event_uuid`, `user_uuid`),
-            CONSTRAINT `fk_registered_event`
-              FOREIGN KEY (`event_uuid`)
-              REFERENCES `calendars`(`uuid`)
-              ON DELETE CASCADE
+            `user_uuid`  VARCHAR(255) NOT NULL,
+            PRIMARY KEY (`event_uuid`, `user_uuid`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
         print("Tabel 'event_users' gecontroleerd/aangemaakt", flush=True)
@@ -133,7 +129,16 @@ class DBClient:
 
     def delete(self, uuid):
         print(f"Verwijderen van kalender (consumer) met UUID {uuid}...", flush=True)
-        self.cursor.execute("DELETE FROM `calendars` WHERE `uuid`=%s", (uuid,))
+        # verwijder eerst alle gekoppelde gebruikers
+        self.cursor.execute(
+            "DELETE FROM `event_users` WHERE `event_uuid` = %s",
+            (uuid,)
+        )
+        # en daarna pas de kalender zelf
+        self.cursor.execute(
+            "DELETE FROM `calendars` WHERE `uuid` = %s",
+            (uuid,)
+        )
 
     def commit(self):
         print("Databasewijzigingen consumer vastleggen...", flush=True)

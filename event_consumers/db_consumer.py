@@ -1,5 +1,6 @@
 import os
 import mysql.connector
+from datetime import datetime
 
 class DBClient:
     def __init__(self):
@@ -24,9 +25,9 @@ class DBClient:
             `uuid` VARCHAR(255) PRIMARY KEY,
             `calendar_id` VARCHAR(255),
             `name` VARCHAR(255),
-            `created_at` DATETIME,
-            `start_datetime` DATETIME,
-            `end_datetime` DATETIME,
+            `created_at` DATETIME(6),
+            `start_datetime` DATETIME(3),
+            `end_datetime` DATETIME(3),
             `description` TEXT,
             `capacity` INT,
             `organizer` VARCHAR(255),
@@ -51,6 +52,9 @@ class DBClient:
         """)
         print("Tabel 'event_users' gecontroleerd/aangemaakt", flush=True)
 
+    def _truncate_to_ms(self, dt):
+        return dt.replace(microsecond=(dt.microsecond // 1000) * 1000)
+
     def insert(self, data: dict):
         print(f"Invoegen van nieuwe kalender (consumer) met UUID {data.get('uuid')}...", flush=True)
         cal_data = data.copy()
@@ -60,6 +64,11 @@ class DBClient:
             cal_data['organizer'] = cal_data.pop('organisator')
 
         cal_data['uuid'] = str(cal_data['uuid'])
+
+        if isinstance(cal_data.get('start_datetime'), datetime):
+            cal_data['start_datetime'] = self._truncate_to_ms(cal_data['start_datetime'])
+        if isinstance(cal_data.get('end_datetime'), datetime):
+            cal_data['end_datetime']   = self._truncate_to_ms(cal_data['end_datetime'])
 
         sql_cal = (
             "INSERT INTO `calendars` (`uuid`,`name`,`description`,`start_datetime`,`end_datetime`,`location`,`organizer`,`capacity`,`event_type`,`calendar_id`,`created_at`,`last_fetched`) "
@@ -98,6 +107,11 @@ class DBClient:
 
         if 'organisator' in fields:
             fields['organizer'] = fields.pop('organisator')
+
+        if isinstance(fields.get('start_datetime'), datetime):
+            fields['start_datetime'] = self._truncate_to_ms(fields['start_datetime'])
+        if isinstance(fields.get('end_datetime'), datetime):
+            fields['end_datetime']   = self._truncate_to_ms(fields['end_datetime'])
 
         set_clauses = []
         params = []

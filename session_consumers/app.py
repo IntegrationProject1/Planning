@@ -1,6 +1,7 @@
 import logging
 import pika
 import json
+import os
 from session_consumers.config import (
     RABBIT_HOST, RABBIT_PORT, RABBIT_USER, RABBIT_PASS,
     EXCHANGE_NAME, QUEUES
@@ -11,7 +12,7 @@ from session_consumers.xml_parser import (
     parse_delete_session_xml
 )
 from session_consumers.db_consumer import DBConsumer
-from session_consumers.calendar_client import CalendarClient
+from session_consumers.calendar_client import CalendarClient, format_rfc3339ms
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -46,13 +47,20 @@ def handle_create(ch, method, properties, body):
     }
     attendees = [{"email": e} for e in data.get('registered_users', [])]
 
+    tz = os.getenv('CALENDAR_TIMEZONE', 'Europe/Brussels')
     google_evt = calcli.service.events().insert(
         calendarId=calendar_id,
         body={
             'summary':     data['session_name'],
             'description': json.dumps(payload, ensure_ascii=False, indent=2),
-            'start':       {'dateTime': data['start_datetime'].isoformat()},
-            'end':         {'dateTime': data['end_datetime'].isoformat()},
+            'start':       {
+                'dateTime': format_rfc3339ms(data['start_datetime']),
+                'timeZone': tz
+            },
+            'end':         {
+                'dateTime': format_rfc3339ms(data['end_datetime']),
+                'timeZone': tz
+            },
             'location':    data.get('session_location'),
             'attendees':   attendees
         }
@@ -85,10 +93,13 @@ def handle_update(ch, method, properties, body):
 
         if 'session_name' in chg:
             body_patch['summary'] = chg['session_name']
+        tz = os.getenv('CALENDAR_TIMEZONE', 'Europe/Brussels')
         if 'start_datetime' in chg:
-            body_patch.setdefault('start', {})['dateTime'] = chg['start_datetime'].isoformat()
+            body_patch.setdefault('start', {})['dateTime']   = format_rfc3339ms(chg['start_datetime'])
+            body_patch['start']['timeZone']                  = tz
         if 'end_datetime' in chg:
-            body_patch.setdefault('end', {})['dateTime']   = chg['end_datetime'].isoformat()
+            body_patch.setdefault('end', {})['dateTime']     = format_rfc3339ms(chg['end_datetime'])
+            body_patch['end']['timeZone']                    = tz
         if 'session_location' in chg:
             body_patch['location'] = chg['session_location']
         if 'registered_users' in chg:

@@ -10,6 +10,14 @@ def format_rfc3339ms(dt):
              .isoformat(timespec='milliseconds') \
              .replace('+00:00', 'Z')
 
+def format_rfc3339us(dt):
+    """Zet een datetime om naar RFC3339 met μs en 'Z' suffix."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc) \
+             .isoformat(timespec='microseconds') \
+             .replace('+00:00', 'Z')
+
 class CalendarClient:
     def __init__(self,
                  service_account_file: str,
@@ -35,12 +43,12 @@ class CalendarClient:
     def create_event(self, calendar_id: str, event_body: dict) -> dict:
         uid = event_body.get('id')
         if hasattr(uid, 'isoformat'):
-            event_body['id'] = format_rfc3339ms(uid)
+            event_body['id'] = format_rfc3339us(uid)
         return self.service.events().insert(calendarId=calendar_id, body=event_body).execute()
 
     def update_event(self, calendar_id: str, event_id: str, event_body: dict) -> dict:
         if hasattr(event_id, 'isoformat'):
-            event_id = format_rfc3339ms(event_id)
+            event_id = format_rfc3339us(event_id)
         return self.service.events().update(
             calendarId=calendar_id,
             eventId=event_id,

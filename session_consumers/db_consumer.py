@@ -35,8 +35,7 @@ class DBConsumer:
                 guest_speaker VARCHAR(255),
                 last_updated DATETIME
             )
-        """
-        )
+        """)
         # registered_users
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS registered_users (
@@ -45,8 +44,7 @@ class DBConsumer:
                 email VARCHAR(255),
                 FOREIGN KEY (session_uuid) REFERENCES sessions(uuid) ON DELETE CASCADE
             )
-        """
-        )
+        """)
 
     def _truncate_to_ms(self, dt: datetime) -> datetime:
         # drop microseconds below the millisecond
@@ -73,7 +71,7 @@ class DBConsumer:
                         emails.append(e)
             gs_csv = ",".join(emails) if emails else None
 
-        # Truncate datetime naar millisecond‐precisie
+        # Truncate datetimes to ms-precision
         if isinstance(start_datetime, datetime):
             start_datetime = self._truncate_to_ms(start_datetime)
         if isinstance(end_datetime, datetime):
@@ -117,7 +115,15 @@ class DBConsumer:
         self.conn.commit()
 
     def update_session(self, session_uuid, changes, guest_speaker=None, registered_users=None):
-        # Truncate eventuele gewijzigde datetimes naar ms-precisie
+        # 1) Skip entire update if parent session doesn't exist
+        self.cursor.execute(
+            "SELECT 1 FROM sessions WHERE uuid = %s LIMIT 1",
+            (session_uuid,)
+        )
+        if not self.cursor.fetchone():
+            return
+
+        # 2) Truncate any changed datetimes to ms-precision
         if 'start_datetime' in changes and isinstance(changes['start_datetime'], datetime):
             changes['start_datetime'] = self._truncate_to_ms(changes['start_datetime'])
         if 'end_datetime' in changes and isinstance(changes['end_datetime'], datetime):
@@ -141,10 +147,12 @@ class DBConsumer:
 
         # Update registered_users if provided
         if registered_users is not None:
+            # remove old registrations
             self.cursor.execute(
                 "DELETE FROM `registered_users` WHERE session_uuid = %s",
                 (session_uuid,)
             )
+            # insert new ones
             for u in registered_users:
                 email = u if isinstance(u, str) else u.get('email')
                 if email:
@@ -153,7 +161,7 @@ class DBConsumer:
                         (session_uuid, email)
                     )
 
-        # Update other fields
+        # Update other simple fields
         set_parts, params = [], []
         mapping = {
             'session_name': 'name',
@@ -217,24 +225,18 @@ class DBConsumer:
         return None
 
     def get_full_session(self, session_uuid: str) -> Dict:
-        """
-        Haal alle velden + geregistreerde users op en bouw de JSON payload
-        zoals we in de description van Google Calendar willen zetten.
-        """
-        # 1) hoofdtabel
         self.cursor.execute(
-            "SELECT uuid, event_type, capacity, description, guest_speaker "
-            "FROM sessions WHERE uuid = %s",
+            "SELECT uuid, event_type, capacity, description, guest_speaker FROM sessions WHERE uuid = %s",
             (session_uuid,)
         )
         row = self.cursor.fetchone() or {}
-        # 2) geregistreerde users
+
         self.cursor.execute(
             "SELECT email FROM registered_users WHERE session_uuid = %s",
             (session_uuid,)
         )
         users = [r['email'] for r in self.cursor.fetchall()]
-        # 3) guest_speaker uit CSV naar lijst
+
         gs_csv = row.get('guest_speaker') or ""
         gs_list = [e for e in gs_csv.split(',') if e]
 

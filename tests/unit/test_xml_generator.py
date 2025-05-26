@@ -2,7 +2,7 @@ from event_producers.xml_generator import build_event_xml, build_update_xml, bui
 from datetime import datetime
 
 dummy_event = {
-    'uuid': datetime(2024, 5, 10, 9, 0),
+    'uuid': '2025-05-25T19:34:13.483000Z',
     'calendar_id': 'abc',
     'name': 'Test Event',
     'created_at': datetime.utcnow(),
@@ -24,13 +24,13 @@ def test_build_event_xml():
     assert "<Capacity>10</Capacity>" in xml
     assert "<Organisator>Organisator</Organisator>" in xml
 
-# def test_build_update_xml():
-#     event_uuid = dummy_event["uuid"]
-#     xml = build_update_xml(event_uuid, {"Capacity": 20})
-#     assert "<UpdateEvent>" in xml
-#     assert "<EventUUID>" in xml
-#     assert "<Capacity>20</Capacity>" in xml
-#     assert "<Name>" not in xml 
+def test_build_update_xml():
+    event_uuid = dummy_event["uuid"]
+    xml = build_update_xml(event_uuid, {"Capacity": 20})
+    assert "<UpdateEvent>" in xml
+    assert "<EventUUID>" in xml
+    assert "<Capacity>20</Capacity>" in xml
+    assert "<Name>" not in xml 
 
 def test_build_delete_xml():
     xml = build_delete_xml("1234") 

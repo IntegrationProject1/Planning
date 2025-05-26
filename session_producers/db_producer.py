@@ -82,22 +82,33 @@ class DBClient:
             print(f"❌ Fout bij ophalen event_uuid uit DB: {e}", flush=True)
             return ""
 
-    def get_event_uuid_from_calendar(self, calendar_id):
-        # Deze functie wordt niet meer gebruikt, maar blijft bestaan als fallback of voor debugdoeleinden
+    def resolve_calendar_id_from_event(self, event_id):
         SCOPES = ['https://www.googleapis.com/auth/calendar']
         SERVICE_ACCOUNT_FILE = 'credentials.json'
+
         try:
             creds = service_account.Credentials.from_service_account_file(
                 SERVICE_ACCOUNT_FILE, scopes=SCOPES
             ).with_subject("contact@youmnimalha.be")
 
             service = build('calendar', 'v3', credentials=creds)
-            calendar = service.calendarList().get(calendarId=calendar_id).execute()
-            description = calendar.get("description", "")
-            parsed = json.loads(description)
-            return parsed.get("uuid")
+            calendar_list = service.calendarList().list().execute().get("items", [])
+
+            for calendar in calendar_list:
+                cal_id = calendar.get("id")
+                try:
+                    event = service.events().get(calendarId=cal_id, eventId=event_id).execute()
+                    if event and event.get("id") == event_id:
+                        print(f"📘 Event gevonden in kalender: {cal_id}", flush=True)
+                        return cal_id
+                except Exception:
+                    continue  # Event bestaat niet in deze kalender
+
+            print(f"⚠️ Geen kalender gevonden die event bevat: {event_id}", flush=True)
+            return ""
+
         except Exception as e:
-            print(f"Fout bij ophalen event_uuid uit calendar omschrijving: {e}", flush=True)
+            print(f"❌ Fout bij zoeken naar kalender voor event: {e}", flush=True)
             return ""
 
     def validate_xml(self, xml_str: str, xsd_filename: str) -> bool:
@@ -198,7 +209,8 @@ class DBClient:
             return "Ongeldige JSON in omschrijving", 400
 
         uuid = parsed_description.get("uuid")
-        calendar_id = data.get("calendarId")
+        event_id = data.get("eventId")
+        calendar_id = self.resolve_calendar_id_from_event(event_id)
         event_uuid = self.get_event_uuid_from_db(calendar_id)
 
         if not uuid:
@@ -209,6 +221,8 @@ class DBClient:
             return "Deleted", 200
 
         parsed = self.parse_event_data(data, uuid, event_uuid, parsed_description)
+        parsed["calendar_id"] = calendar_id
+        parsed["event_id"] = event_id
         existing = self.get_by_uuid(uuid)
         parsed["registered_users"] = parsed.get("registered_users", [])
 

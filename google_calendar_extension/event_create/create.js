@@ -11,13 +11,9 @@ console.log("📘 Vertalingen geladen:", t);
 
 // ⏱️ Voeg functie toe voor microsecondenprecisie
 function formatToMicroseconds(date) {
-  const iso = date.toISOString(); // bijv. "2025-05-25T17:05:29.129Z"
+  const iso = date.toISOString();
   const match = iso.match(/^(.+\.\d{3})Z$/);
-  if (match) {
-    return `${match[1]}000Z`; // voeg 3 nullen toe vóór de Z
-  } else {
-    return iso.replace('Z', '000Z'); // fallback
-  }
+  return match ? `${match[1]}000Z` : iso.replace('Z', '000Z');
 }
 
 function observeURLandInject() {
@@ -53,9 +49,21 @@ function tryInjectUI() {
   const container = document.querySelector("div.ewPPR");
   const saveButton = document.querySelector('#xSaveBu');
 
-  if (!editable || !descriptionContainer) console.warn("❌ Beschrijvingscontainer niet gevonden");
-  if (!saveButton) console.warn("❌ Opslaan-knop niet gevonden");
-  if (!container) console.warn("❌ Container ewPPR niet gevonden");
+  // 👇 Check of editable en descriptionContainer gevonden zijn
+  if (!editable || !descriptionContainer) {
+    console.warn("❌ Beschrijvingscontainer of editable veld niet gevonden");
+    return false;
+  }
+
+  if (!saveButton) {
+    console.warn("❌ Opslaan-knop niet gevonden");
+    return false;
+  }
+
+  if (!container) {
+    console.warn("❌ Container ewPPR niet gevonden");
+    return false;
+  }
 
   const injectTarget = descriptionContainer?.parentElement || container;
 
@@ -71,6 +79,7 @@ function tryInjectUI() {
   hasInjected = true;
   return true;
 }
+
 
 function updateDescription(textarea, data) {
   const json = JSON.stringify(data, null, 2);
@@ -117,14 +126,46 @@ function injectUI(textarea, injectTarget, saveButton, descriptionContainer) {
   const wrapper = document.createElement("div");
   wrapper.className = "custom-extension-wrapper";
 
-  // ✅ Gebruik microseconden voor uuid
-  const jsonData = {
+  let jsonData = {
     uuid: formatToMicroseconds(new Date()),
     guestspeaker: [],
     session_type: "",
     capacity: 0,
     description: ""
   };
+
+  // 🧼 JSON proberen te parsen vanuit textarea
+  let existingText = textarea.innerText
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\r\n]+/g, '\n')
+    .replace(/^\s*[\n\r]/gm, '')
+    .trim();
+
+  console.log("📝 Beschrijving na opschoning:\n", existingText);
+
+  if (existingText) {
+    try {
+      const parsed = JSON.parse(existingText);
+      if (parsed && typeof parsed === "object") {
+        jsonData = { ...jsonData, ...parsed };
+        console.log("✅ JSON uit beschrijving geladen:", jsonData);
+      }
+    } catch (e1) {
+      console.warn("❌ JSON parsing mislukt:", e1.message);
+      try {
+        const fixed = existingText
+          .replace(/(\w+):/g, '"$1":')
+          .replace(/'/g, '"');
+        const parsed = JSON.parse(fixed);
+        if (parsed && typeof parsed === "object") {
+          jsonData = { ...jsonData, ...parsed };
+          console.log("🛠️ Gedeeltelijk herstelde JSON geladen:", jsonData);
+        }
+      } catch (e2) {
+        console.error("❌ Ook herstelde JSON parsing mislukt:", e2.message);
+      }
+    }
+  }
 
   const inputs = {};
   const errors = {};
@@ -154,6 +195,12 @@ function injectUI(textarea, injectTarget, saveButton, descriptionContainer) {
     }
 
     input.className = "custom-input";
+
+    // 🔄 Initieel invullen met JSON-data
+    input.value = key === "guestspeaker"
+      ? (jsonData[key]?.join(", ") || "")
+      : (jsonData[key] ?? "");
+
     inputs[key] = input;
 
     const errorEl = document.createElement("div");
@@ -210,7 +257,8 @@ function injectUI(textarea, injectTarget, saveButton, descriptionContainer) {
 
   injectTarget.appendChild(wrapper);
   validateForm(inputs, saveButton);
-  console.log("✅ UI met validatie toegevoegd");
+  updateDescription(textarea, jsonData);
+  console.log("✅ UI met velden en bestaande data toegevoegd");
 }
 
 observeURLandInject();

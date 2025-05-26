@@ -177,11 +177,18 @@ class DBClient:
             self.insert_registered_users(data["uuid"], data.get("registered_users", []))
 
         registered_users = data.get("registered_users", []) if include_users else []
+
+        for key in ["event_uuid", "name"]:
+            if key not in changed_fields:
+                changed_fields[key] = data_copy.get(key, "")
+
         xml = build_update_session_xml(data["uuid"], changed_fields, registered_users)
+
         if self.validate_xml(xml, "update_session.xsd"):
             self.queue.send(["crm.session.update"], xml)
         else:
             print("Ongeldige XML, niet verzonden", flush=True)
+
         self.conn.commit()
 
     def delete(self, uuid):

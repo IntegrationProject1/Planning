@@ -38,8 +38,8 @@ def handle_message(routing_key: str, body: bytes):
         payload = {
             'uuid':          uuid_str,
             'createdAt':     format_rfc3339ms(datetime.utcnow()),
-            'startDateTime': data['start_datetime'].isoformat() + 'Z',
-            'endDateTime':   data['end_datetime'].isoformat() + 'Z',
+            'startDateTime': format_rfc3339ms(data['start_datetime']),
+            'endDateTime':   format_rfc3339ms(data['end_datetime']),
             'description':   data['description'],
             'capacity':      str(data.get('capacity')),
             'organizer':     data.get('organisator'),
@@ -86,8 +86,8 @@ def handle_message(routing_key: str, body: bytes):
         payload = {
             'uuid':          rec['uuid'],
             'createdAt':     format_rfc3339ms(rec['created_at']),
-            'startDateTime': rec['start_datetime'].isoformat() + 'Z',
-            'endDateTime':   rec['end_datetime'].isoformat() + 'Z',
+            'startDateTime': format_rfc3339ms(data['start_datetime']),
+            'endDateTime':   format_rfc3339ms(data['end_datetime']),
             'description':   rec['description'],
             'capacity':      str(rec['capacity']),
             'organizer':     rec['organizer'],

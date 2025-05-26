@@ -16,7 +16,7 @@
     },
     {
       "matches": [
-        "https://calendar.google.com/calendar/u*/r/settings/editcalendar*"
+        "https://calendar.google.com/calendar/u*/r/settings/calendar*"
       ],
       "js": ["translations.js", "edit/edit.js"],
       "css": ["edit/edit.css"],

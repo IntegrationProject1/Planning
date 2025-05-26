@@ -53,6 +53,8 @@ def build_update_xml(uuid: str, changed_fields: dict) -> str:
 
 def build_delete_xml(uuid: str) -> str:
     root = ET.Element("DeleteEvent")
+    
+    ET.SubElement(root, "ActionType").text = "DELETE"
     ET.SubElement(root, "EventUUID").text = uuid
 
     time_of_action = format_datetime(datetime.utcnow(), timespec="microseconds")

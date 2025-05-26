@@ -9,6 +9,17 @@ console.log("🌐 Gedetecteerde taal:", userLang);
 const t = window.translations?.[userLang] || window.translations?.["en"] || {};
 console.log("📘 Vertalingen geladen:", t);
 
+// ⏱️ Voeg functie toe voor microsecondenprecisie
+function formatToMicroseconds(date) {
+  const iso = date.toISOString(); // bijv. "2025-05-25T17:05:29.129Z"
+  const match = iso.match(/^(.+\.\d{3})Z$/);
+  if (match) {
+    return `${match[1]}000Z`; // voeg 3 nullen toe vóór de Z
+  } else {
+    return iso.replace('Z', '000Z'); // fallback
+  }
+}
+
 function observeURLandInject() {
   console.log("🔁 Observer actief om URL te monitoren...");
   setInterval(() => {
@@ -93,6 +104,7 @@ function validateForm(inputs, saveButton) {
 
   return allValid;
 }
+
 function injectUI(textarea, injectTarget, saveButton, descriptionContainer) {
   if (descriptionContainer) {
     descriptionContainer.style.display = "none";
@@ -105,8 +117,9 @@ function injectUI(textarea, injectTarget, saveButton, descriptionContainer) {
   const wrapper = document.createElement("div");
   wrapper.className = "custom-extension-wrapper";
 
+  // ✅ Gebruik microseconden voor uuid
   const jsonData = {
-    uuid: new Date().toISOString(),
+    uuid: formatToMicroseconds(new Date()),
     guestspeaker: [],
     session_type: "",
     capacity: 0,
@@ -151,7 +164,6 @@ function injectUI(textarea, injectTarget, saveButton, descriptionContainer) {
     input.addEventListener("input", () => {
       const value = input.value.trim();
 
-      // Validatie en json bijwerken
       if (key === "guestspeaker") {
         const emails = value.split(",").map(e => e.trim());
         const invalid = emails.find(e => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));

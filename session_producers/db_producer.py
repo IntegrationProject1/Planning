@@ -3,7 +3,7 @@ from session_producers.xml_generator import (
     build_update_session_xml,
     build_delete_session_xml
 )
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil import parser as dateparser
 from lxml import etree
 import json
@@ -28,8 +28,8 @@ class DBClient:
                 event_id VARCHAR(255),
                 name VARCHAR(255),
                 description TEXT,
-                start_datetime DATETIME,
-                end_datetime DATETIME,
+                start_datetime DATETIME(3),
+                end_datetime DATETIME(3),
                 location VARCHAR(255),
                 organizer VARCHAR(255),
                 event_type VARCHAR(255),
@@ -48,7 +48,16 @@ class DBClient:
             )
         """)
 
+    def _format_uuid(self, value):
+        try:
+            dt = dateparser.parse(value) if not isinstance(value, datetime) else value
+            return dt.astimezone(timezone.utc).isoformat(timespec='microseconds').replace('+00:00', 'Z')
+        except Exception as e:
+            print(f"⚠️ Kan UUID niet formatteren: {e}", flush=True)
+            return str(value)
+
     def get_by_uuid(self, uuid):
+        uuid = self._format_uuid(uuid)
         self.cursor.execute("SELECT * FROM sessions WHERE uuid = %s", (uuid,))
         row = self.cursor.fetchone()
         if not row:
@@ -90,6 +99,7 @@ class DBClient:
 
     def insert(self, data: dict):
         db_data = data.copy()
+        db_data['uuid'] = self._format_uuid(db_data['uuid'])
         db_data.pop("registered_users", None)
 
         self.cursor.execute("""
@@ -114,6 +124,7 @@ class DBClient:
 
     def update(self, data: dict, changed_fields: dict):
         data_copy = data.copy()
+        data_copy['uuid'] = self._format_uuid(data_copy['uuid'])
         data_copy.pop("registered_users", None)
 
         include_users = "registered_users" in changed_fields
@@ -149,6 +160,7 @@ class DBClient:
         self.conn.commit()
 
     def delete(self, uuid):
+        uuid = self._format_uuid(uuid)
         self.cursor.execute("DELETE FROM sessions WHERE uuid = %s", (uuid,))
         xml = build_delete_session_xml(uuid)
         if self.validate_xml(xml, "delete_session.xsd"):

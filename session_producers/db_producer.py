@@ -69,7 +69,21 @@ class DBClient:
         self.cursor.execute("SELECT email FROM registered_users WHERE session_uuid = %s", (uuid,))
         return [row[0] for row in self.cursor.fetchall()]
 
+    def get_event_uuid_from_db(self, calendar_id):
+        try:
+            self.cursor.execute("SELECT uuid FROM calendars WHERE calendar_id = %s", (calendar_id,))
+            row = self.cursor.fetchone()
+            if row:
+                return row[0]
+            else:
+                print(f"⚠️ Geen event_uuid gevonden voor calendar_id: {calendar_id}", flush=True)
+                return ""
+        except Exception as e:
+            print(f"❌ Fout bij ophalen event_uuid uit DB: {e}", flush=True)
+            return ""
+
     def get_event_uuid_from_calendar(self, calendar_id):
+        # Deze functie wordt niet meer gebruikt, maar blijft bestaan als fallback of voor debugdoeleinden
         SCOPES = ['https://www.googleapis.com/auth/calendar']
         SERVICE_ACCOUNT_FILE = 'credentials.json'
         try:
@@ -185,7 +199,7 @@ class DBClient:
 
         uuid = parsed_description.get("uuid")
         calendar_id = data.get("calendarId")
-        event_uuid = self.get_event_uuid_from_calendar(calendar_id)
+        event_uuid = self.get_event_uuid_from_db(calendar_id)
 
         if not uuid:
             return "UUID ontbreekt in omschrijving", 400

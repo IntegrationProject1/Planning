@@ -1,5 +1,6 @@
 import os
 import mysql.connector
+from datetime import datetime
 from typing import Optional, Dict
 
 class DBConsumer:
@@ -18,34 +19,38 @@ class DBConsumer:
     def _ensure_tables(self):
         # sessions
         self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS `sessions` (
-            `uuid` VARCHAR(255) PRIMARY KEY,
-            `event_uuid` VARCHAR(255) NOT NULL,
-            INDEX (`event_uuid`),
-            `calendar_id` VARCHAR(255) DEFAULT NULL,
-            `event_id` VARCHAR(255) DEFAULT NULL,
-            INDEX (`event_id`),
-            `name` VARCHAR(255) DEFAULT NULL,
-            `description` TEXT,
-            `start_datetime` DATETIME,
-            `end_datetime` DATETIME,
-            `location` VARCHAR(255),
-            `event_type` VARCHAR(255),
-            `capacity` INT,
-            `guest_speaker` TEXT,
-            `last_updated` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """)
+            CREATE TABLE IF NOT EXISTS sessions (
+                uuid VARCHAR(255) PRIMARY KEY,
+                event_uuid VARCHAR(255),
+                calendar_id VARCHAR(255),
+                event_id VARCHAR(255),
+                name VARCHAR(255),
+                description TEXT,
+                start_datetime DATETIME(3),
+                end_datetime DATETIME(3),
+                location VARCHAR(255),
+                organizer VARCHAR(255),
+                event_type VARCHAR(255),
+                capacity INT,
+                guest_speaker VARCHAR(255),
+                last_updated DATETIME
+            )
+        """
+        )
         # registered_users
         self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS `registered_users` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `session_uuid` VARCHAR(255),
-            `email` VARCHAR(255),
-            INDEX (`session_uuid`),
-            FOREIGN KEY (`session_uuid`) REFERENCES `sessions`(`uuid`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """)
+            CREATE TABLE IF NOT EXISTS registered_users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                session_uuid VARCHAR(255),
+                email VARCHAR(255),
+                FOREIGN KEY (session_uuid) REFERENCES sessions(uuid) ON DELETE CASCADE
+            )
+        """
+        )
+
+    def _truncate_to_ms(self, dt: datetime) -> datetime:
+        # drop microseconds below the millisecond
+        return dt.replace(microsecond=(dt.microsecond // 1000) * 1000)
 
     def create_session(self, *,
                        session_uuid, event_uuid,
@@ -68,7 +73,12 @@ class DBConsumer:
                         emails.append(e)
             gs_csv = ",".join(emails) if emails else None
 
-        # Insert or update session
+        # Truncate datetime naar millisecond‐precisie
+        if isinstance(start_datetime, datetime):
+            start_datetime = self._truncate_to_ms(start_datetime)
+        if isinstance(end_datetime, datetime):
+            end_datetime = self._truncate_to_ms(end_datetime)
+
         sql = """
         INSERT INTO `sessions`
           (uuid, event_uuid, calendar_id, event_id, name, description,
@@ -107,6 +117,12 @@ class DBConsumer:
         self.conn.commit()
 
     def update_session(self, session_uuid, changes, guest_speaker=None, registered_users=None):
+        # Truncate eventuele gewijzigde datetimes naar ms-precisie
+        if 'start_datetime' in changes and isinstance(changes['start_datetime'], datetime):
+            changes['start_datetime'] = self._truncate_to_ms(changes['start_datetime'])
+        if 'end_datetime' in changes and isinstance(changes['end_datetime'], datetime):
+            changes['end_datetime'] = self._truncate_to_ms(changes['end_datetime'])
+
         # Update guest_speaker if provided
         if guest_speaker is not None:
             emails = []
@@ -200,7 +216,6 @@ class DBConsumer:
             }
         return None
 
-    # ─── Nieuwe helper ─────────────────────────────────────────────────────────────
     def get_full_session(self, session_uuid: str) -> Dict:
         """
         Haal alle velden + geregistreerde users op en bouw de JSON payload

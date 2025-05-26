@@ -3,7 +3,7 @@ import json
 import pytest
 
 BASE_URL = "http://session_producer:30015"
-UUID = "2025-05-22T15:00:00"
+UUID = "2025-05-22T15:00:00.000000Z"
 
 @pytest.mark.order(1)
 def test_create_session():

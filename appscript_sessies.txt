@@ -1,0 +1,75 @@
+App Script dat wordt gebruikt voor sessies door te sturen binnen het Google Calander Account. Alles binnen de "-----" moet worden toegvoegd binnen een App Script Project met Google Calander als service. De file noemt Code.gs waar het in moet.
+--------------------------------------------------------------------
+function checkCalendarChanges() {
+  const now = new Date();
+  const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+  const future = new Date(now.getTime() + 5 * 365.25 * 24 * 60 * 60 * 1000);
+
+  const calendarList = Calendar.CalendarList.list().items;
+
+  calendarList.forEach(calendar => {
+    const calendarId = calendar.id;
+
+    if (calendar.accessRole !== "owner" && calendar.accessRole !== "writer") {
+      Logger.log("⏭️ Agenda overgeslagen: " + calendar.summary + " (" + calendar.accessRole + ")");
+      return;
+    }
+
+    try {
+      const events = Calendar.Events.list(calendarId, {
+        timeMin: now.toISOString(),           // alleen toekomstige events
+        timeMax: future.toISOString(),        // 5 jaar verder max 
+        showDeleted: true,
+        singleEvents: true
+      }).items;
+
+      if (!events) return;
+
+      events.forEach(event => {
+        const updatedTime = new Date(event.updated);
+        if (updatedTime < oneMinuteAgo || updatedTime > now) {
+          Logger.log("Event niet gewijzigd in de laatste minuut: " + event.summary + " (" + event.updated + ")");
+          return;
+        }
+
+        const payload = {
+          calendarId: calendarId,
+          eventId: event.id,
+          summary: event.summary || null,
+          description: event.description || null,
+          status: event.status,
+          start: event.start || null,
+          end: event.end || null,
+          updated: event.updated,
+          location: event.location || null,
+          attendees: event.attendees || [],
+          organizer: event.organizer || null
+        };
+
+
+        try {
+          UrlFetchApp.fetch("http://integrationproject-2425s2-001.westeurope.cloudapp.azure.com:30015/api/calendar-ping", {
+            method: "post",
+            contentType: "application/json",
+            payload: JSON.stringify(payload)
+          });
+          Logger.log("📤 Verzonden event: " + event.summary + " (" + event.id + ")");
+        } catch (e) {
+          Logger.log("❌ Fout bij verzenden van event " + event.id + ": " + e.message);
+        }
+      });
+    } catch (e) {
+      Logger.log("❌ Fout bij ophalen events voor agenda '" + calendar.summary + "': " + e.message);
+    }
+  });
+}
+
+
+
+function createTimeTrigger() {
+  ScriptApp.newTrigger("checkCalendarChanges")
+    .timeBased()
+    .everyMinutes(1)
+    .create();
+}
+------------------------------------------------------------------
